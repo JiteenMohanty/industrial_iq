@@ -36,7 +36,10 @@ export function DataTable<T>({
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={rowKey(row)} className="border-b border-grid last:border-0">
+            <tr
+              key={rowKey(row)}
+              className="border-b border-grid transition-colors duration-150 last:border-0 hover:bg-page"
+            >
               {columns.map((c) => (
                 <td
                   key={c.header}

@@ -87,7 +87,7 @@ export default async function RepDetailPage({
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="animate-fade-in space-y-8">
       <div>
         <h1 className="text-xl font-semibold text-ink-primary">{detail.repName}</h1>
         <p className="text-sm text-ink-secondary">

@@ -62,7 +62,7 @@ export default async function OverviewPage({
   });
 
   return (
-    <div className="space-y-8">
+    <div className="animate-fade-in space-y-8">
       <section aria-label="Headline metrics" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatTile
           label="Delivered units"

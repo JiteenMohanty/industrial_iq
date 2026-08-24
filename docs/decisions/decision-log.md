@@ -1347,3 +1347,100 @@ deleted from this local checkout. Left for the user to remove manually once what
 releases (e.g., after this session ends).
 
 **Alternatives considered**: See ADR-0010.
+
+---
+
+## 2026-08-24 · Post-implementation (user request) — UI polish: dark mode, refined light theme, restrained motion
+
+### Dark mode added — reverses the T030 "light mode only" decision
+
+**Decision**: Built a real dark theme with a user-controlled toggle
+(`src/components/theme/ThemeProvider.tsx`, `ThemeToggle.tsx`), reversing T030's earlier "globals.css
+implements light mode only" call.
+
+**Reasoning**: T030 deferred dark mode as scope nobody had asked for on a fixed-deadline build. The
+user has now explicitly asked for it as part of a UI-polish pass, after asking three clarifying
+questions up front (visual direction, dark mode, animation level) rather than guessing. The dark
+color VALUES T030 already computed from the dataviz skill's reference palette
+(`COLOR.accentDark`/`ink.primaryDark`/`ink.secondaryDark`/`surface.chartDark`/`surface.pageDark`/
+`grid.dark` in `lib/theme.ts`) were carried forward unchanged into the new `.dark` CSS block and the
+new `getChartColors()` helper — computed once, correctly, and simply left unused until now, exactly
+the kind of dormant-but-correct groundwork T030's own comment anticipated ("mode-invariant by
+design" for severity, explicit light/dark pairs for everything else).
+
+**Mechanism**: almost the entire UI already used semantic, CSS-variable-backed Tailwind utilities
+(`bg-surface`, `text-ink-primary`, `border-grid`, `bg-accent`, ...) rather than raw color utilities
+— confirmed by grep before starting (zero `bg-gray-*`/`text-slate-*`/etc. hits anywhere in `src/`).
+This meant dark mode could be implemented almost entirely by overriding the same custom-property
+names under a `.dark` selector in `globals.css`, rather than adding `dark:`-prefixed classes to
+every component individually. The two exceptions: Recharts chart components pass `stroke`/`fill` as
+literal color strings (not reliably `var()`-compatible across every Recharts primitive), so those
+five chart files (`FunnelChart`, `TrendChart`, `StageMix`'s two exports, `Sparkline`) call the new
+`getChartColors(isDark)` helper via a `useTheme()` hook instead.
+
+**FOUC prevention**: a blocking inline `<script>` in `layout.tsx`'s `<head>` sets the `.dark` class
+on `<html>` synchronously before first paint, reading `localStorage` then falling back to
+`prefers-color-scheme`. This created a real hydration-mismatch bug, caught and fixed before
+shipping: `ThemeProvider`'s initial React state read `document.documentElement`'s class directly,
+which the server (rendering with no `document`) can't do — server always produces "light," but a
+client whose stored preference is "dark" would hydrate reading "dark" immediately, and since
+`ThemeToggle`'s icon depends on `theme`, the two renders would produce different DOM (moon vs. sun
+icon), a genuine mismatch, not just an unused code path. Fixed by starting React state at "light"
+unconditionally (matching what SSR always emits) and syncing to the real value in a
+`useLayoutEffect` (fires before paint, so no visible flash) rather than reading `document` in the
+initial `useState`. The page's actual *colors* were never affected by this bug — those were already
+correctly set by the blocking script before React even started — only the toggle button's own icon
+would have flashed on a mismatch.
+
+**Alternatives considered**: A CSS-only `prefers-color-scheme` media query with no toggle — rejected
+per the user's explicit choice of a user-controlled toggle over OS-only. Adding `next-themes` (a
+purpose-built npm package for exactly this) — rejected; hand-rolling is ~40 lines given the
+CSS-variable-override strategy already does most of the work, and adding a new dependency for that
+little code is a stack change disproportionate to what's needed, consistent with this project's
+general bias against unnecessary dependencies (see the T023 `server-only` mocking entry's own
+minimal-footprint reasoning).
+
+### Refined-professional visual direction: gradient accent, card elevation, unchanged severity/series colours
+
+**Decision**: Added a two-stop accent gradient (`from-accent to-accent-hover`) to the wordmark, the
+custom-range "Apply" button, and the funnel page's active overlay pill — previously all flat
+`bg-accent`. `Card` gained a `shadow-sm` base and an opt-in `hoverable` prop (lift + stronger shadow
+on hover), used by `StatTile` and `InsightCard` — the two places a card is genuinely the interactive
+unit — but not the funnel page's plain display cards. `DataTable` rows gained a `hover:bg-page`
+highlight. Severity colours (`critical`/`warning`/`good`) and the 8-hue categorical series palette
+are untouched, per the user's explicit answer.
+
+**Reasoning**: The user asked for "refined professional" (their selected option) over more vibrant or
+fully-dark-first alternatives — richer without abandoning the restrained, data-tool feel the
+Constitution's design constraints already establish ("single accent plus a neutral scale... one type
+scale"). Gradients and shadows are additive polish on top of that existing system, not a palette
+replacement, which is also why severity/series colours — the two things carrying real semantic
+meaning — were left alone even though the user said they were open to changing them; there was no
+reason to spend that latitude when the "refined" direction doesn't call for it.
+
+### Motion: minimal, chosen after three levels were offered
+
+**Decision**: `transition-colors`/`transition-all` (150-200ms) added to every interactive
+element's hover/focus state that lacked one; a single `fade-in` keyframe (350ms, translateY(4px)→0)
+applied to each page's root wrapper; a 300ms `background-color`/`color` transition on `body` so the
+theme toggle fades rather than snaps. Respects `prefers-reduced-motion: reduce` (animations disabled,
+transitions collapsed to near-zero duration). No number-counting, no staggered list entrance, no
+chart draw-in animations.
+
+**Reasoning**: Offered three explicit levels (subtle/rich/minimal) rather than assuming; the user
+chose "Minimal" specifically over "Rich & noticeable" when given the choice, even though their
+original request said "add animations" — read together, this means: fix the static/lifeless feel
+with real but restrained interactive feedback, not decorative motion for its own sake. Hover
+transitions and the theme-toggle fade are the two places motion is most load-bearing for "feels
+alive" without becoming a distraction from the data itself.
+
+**Verified**: `npm run build` clean, `npx tsc --noEmit` clean, `npx eslint .` clean, `npx vitest run`
+149/149 passing (no regressions — theme changes touched zero analytics/insight logic), the
+`.next/static` dataset-leak gate re-confirmed clean, and a curl-based structural sweep (FOUC script
+present, toggle button present with correct default `aria-label`/`aria-pressed`, gradient classes
+compiled, `.dark` CSS block compiled into the production stylesheet with the correct override
+values, zero literal `undefined`/`NaN`/`Infinity` across `/`, `/funnel`, `/deliveries`, `/branches`,
+`/branches/B3`, `/reps/SR27`). **Not verified**: actual visual appearance in a real browser, in
+either theme — the `claude-in-chrome` browser tool was unavailable in this environment (same
+limitation as the earlier T100/T101 responsive/accessibility pass). The user should give this a real
+look before considering it final, particularly the dark theme's contrast and the hover/lift feel.

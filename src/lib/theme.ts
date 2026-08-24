@@ -71,3 +71,18 @@ export const CATEGORICAL_SERIES = [
   "#4a3aa7", // violet
   "#e34948", // red
 ] as const;
+
+/**
+ * Resolves the theme-dependent subset of COLOR that Recharts components need as literal strings
+ * (stroke/fill props don't reliably take CSS `var()` across every Recharts primitive, unlike plain
+ * DOM elements — which is why the rest of the UI re-themes via CSS custom-property overrides in
+ * globals.css's `.dark` block, but charts need this instead). Every client chart component calls
+ * this once with `useTheme().theme === "dark"` rather than each hand-rolling its own ternaries.
+ */
+export function getChartColors(isDark: boolean) {
+  return {
+    accent: isDark ? COLOR.accentDark : COLOR.accent,
+    grid: isDark ? COLOR.grid.dark : COLOR.grid.light,
+    mutedInk: isDark ? COLOR.ink.mutedDark : COLOR.ink.mutedLight,
+  };
+}

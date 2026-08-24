@@ -64,7 +64,7 @@ export default async function FunnelPage({
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="animate-fade-in space-y-8">
       <section aria-label="Conversion funnel">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-ink-primary">Conversion funnel</h2>
@@ -72,7 +72,7 @@ export default async function FunnelPage({
             <span className="text-ink-secondary">Overlay branch:</span>
             <Link
               href={overlayHref(null)}
-              className={`rounded-full px-2 py-1 ${!overlayBranchId ? "bg-accent text-white" : "text-accent hover:underline"}`}
+              className={`rounded-full px-2 py-1 transition-all duration-150 ${!overlayBranchId ? "bg-gradient-to-r from-accent to-accent-hover text-white shadow-sm" : "text-accent hover:underline"}`}
             >
               None
             </Link>
@@ -80,7 +80,7 @@ export default async function FunnelPage({
               <Link
                 key={b.id}
                 href={overlayHref(b.id)}
-                className={`rounded-full px-2 py-1 ${overlayBranchId === b.id ? "bg-accent text-white" : "text-accent hover:underline"}`}
+                className={`rounded-full px-2 py-1 transition-all duration-150 ${overlayBranchId === b.id ? "bg-gradient-to-r from-accent to-accent-hover text-white shadow-sm" : "text-accent hover:underline"}`}
               >
                 {b.name}
               </Link>

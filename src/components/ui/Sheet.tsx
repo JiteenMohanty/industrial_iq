@@ -41,7 +41,7 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
         <button
           onClick={onClose}
           aria-label="Close"
-          className="rounded p-1 text-ink-secondary hover:bg-page hover:text-ink-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          className="rounded p-1 text-ink-secondary transition-colors duration-150 hover:bg-page hover:text-ink-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         >
           ✕
         </button>

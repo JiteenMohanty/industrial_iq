@@ -7,7 +7,26 @@ import { formatDate } from "@/lib/format";
 import { TimeRangeFilter } from "@/components/filters/TimeRangeFilter";
 import { BranchFilter } from "@/components/filters/BranchFilter";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import "./globals.css";
+
+/**
+ * Sets the `.dark` class on <html> synchronously, before first paint — must run as a plain
+ * blocking script, not a React effect, or the page would flash light-then-dark on every load for
+ * a reader who has the dark theme stored. Precedence: stored preference, then OS preference, then
+ * light. Wrapped in try/catch since localStorage can throw in some privacy-mode configurations;
+ * a throw here must never break the page, just fall back to the light default.
+ */
+const THEME_INIT_SCRIPT = `
+(function () {
+  try {
+    var stored = localStorage.getItem("dealerpulse-theme");
+    var dark = stored === "dark" || (stored !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    if (dark) document.documentElement.classList.add("dark");
+  } catch (e) {}
+})();
+`;
 
 export const metadata: Metadata = {
   title: "DealerPulse",
@@ -39,46 +58,53 @@ function SiteNav() {
   return (
     <nav aria-label="Main" className="border-b border-grid bg-surface">
       <div className="relative mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
-        <Link href="/" className="font-semibold text-ink-primary">
+        <Link
+          href="/"
+          className="bg-gradient-to-r from-accent to-accent-hover bg-clip-text font-semibold text-transparent"
+        >
           DealerPulse
         </Link>
 
-        <ul className="hidden items-center gap-6 lg:flex">
-          {NAV_LINKS.map((link) => (
-            <li key={link.href}>
-              <Link
-                href={link.href}
-                className="text-sm text-ink-secondary hover:text-ink-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-              >
-                {link.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-
-        {/* Native <details>/<summary> disclosure — keyboard-accessible by default, no client
-            JS required, so the nav collapse (Constitution: "nav collapses under lg") stays
-            server-rendered rather than needing a 4th category of client component. */}
-        <details className="lg:hidden">
-          <summary
-            aria-label="Open menu"
-            className="cursor-pointer list-none rounded p-2 text-ink-secondary hover:bg-page focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-          >
-            <span aria-hidden="true">☰</span>
-          </summary>
-          <ul className="absolute right-4 z-10 mt-2 w-48 rounded-lg border border-border bg-surface p-2 shadow-lg">
+        <div className="flex items-center gap-4">
+          <ul className="hidden items-center gap-6 lg:flex">
             {NAV_LINKS.map((link) => (
               <li key={link.href}>
                 <Link
                   href={link.href}
-                  className="block rounded px-3 py-2 text-sm text-ink-primary hover:bg-page"
+                  className="text-sm text-ink-secondary transition-colors duration-150 hover:text-ink-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 >
                   {link.label}
                 </Link>
               </li>
             ))}
           </ul>
-        </details>
+
+          <ThemeToggle />
+
+          {/* Native <details>/<summary> disclosure — keyboard-accessible by default, no client
+              JS required, so the nav collapse (Constitution: "nav collapses under lg") stays
+              server-rendered rather than needing a 4th category of client component. */}
+          <details className="lg:hidden">
+            <summary
+              aria-label="Open menu"
+              className="cursor-pointer list-none rounded p-2 text-ink-secondary transition-colors duration-150 hover:bg-page focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            >
+              <span aria-hidden="true">☰</span>
+            </summary>
+            <ul className="absolute right-4 z-10 mt-2 w-48 rounded-lg border border-border bg-surface p-2 shadow-lg">
+              {NAV_LINKS.map((link) => (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    className="block rounded px-3 py-2 text-sm text-ink-primary transition-colors duration-150 hover:bg-page"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </details>
+        </div>
       </div>
       <Suspense fallback={<FilterBarSkeleton />}>
         <FilterBar />
@@ -128,19 +154,26 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Must run synchronously, before first paint, to set the .dark class before the browser
+            renders anything (FOUC) — see THEME_INIT_SCRIPT's own comment above. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body>
-        <a
-          href="#main-content"
-          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-accent focus:px-3 focus:py-2 focus:text-white"
-        >
-          Skip to content
-        </a>
-        <FreshnessBanner />
-        <SiteNav />
-        <main id="main-content" className="mx-auto max-w-7xl px-4 py-6">
-          {children}
-        </main>
+        <ThemeProvider>
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-accent focus:px-3 focus:py-2 focus:text-white"
+          >
+            Skip to content
+          </a>
+          <FreshnessBanner />
+          <SiteNav />
+          <main id="main-content" className="mx-auto max-w-7xl px-4 py-6">
+            {children}
+          </main>
+        </ThemeProvider>
       </body>
     </html>
   );

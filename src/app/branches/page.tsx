@@ -114,7 +114,7 @@ export default async function BranchesPage({
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="animate-fade-in space-y-8">
       <section aria-label="Branch comparison">
         <h2 className="mb-3 text-lg font-semibold text-ink-primary">Branches</h2>
         <p className="mb-4 text-sm text-ink-secondary">

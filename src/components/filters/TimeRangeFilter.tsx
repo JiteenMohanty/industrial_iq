@@ -93,7 +93,7 @@ export function TimeRangeFilter({ minDate, maxDate }: { minDate: string; maxDate
         id="time-range-select"
         value={selectValue}
         onChange={(e) => handleSelect(e.target.value)}
-        className="rounded-md border border-border bg-surface px-2 py-1 text-sm text-ink-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+        className="rounded-md border border-border bg-surface px-2 py-1 text-sm text-ink-primary transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
       >
         <option value="full">Full range</option>
         <option value="last30">Last 30 days</option>
@@ -120,7 +120,7 @@ export function TimeRangeFilter({ minDate, maxDate }: { minDate: string; maxDate
             max={maxDate}
             value={customFrom}
             onChange={(e) => setCustomFrom(e.target.value)}
-            className="rounded-md border border-border bg-surface px-2 py-1 text-sm text-ink-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            className="rounded-md border border-border bg-surface px-2 py-1 text-sm text-ink-primary transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           />
           <span aria-hidden="true" className="text-ink-secondary">
             –
@@ -135,12 +135,12 @@ export function TimeRangeFilter({ minDate, maxDate }: { minDate: string; maxDate
             max={maxDate}
             value={customTo}
             onChange={(e) => setCustomTo(e.target.value)}
-            className="rounded-md border border-border bg-surface px-2 py-1 text-sm text-ink-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            className="rounded-md border border-border bg-surface px-2 py-1 text-sm text-ink-primary transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           />
           <button
             type="button"
             onClick={applyCustom}
-            className="rounded-md bg-accent px-2 py-1 text-sm font-medium text-white hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            className="rounded-md bg-gradient-to-r from-accent to-accent-hover px-2 py-1 text-sm font-medium text-white shadow-sm transition-all duration-150 hover:shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           >
             Apply
           </button>

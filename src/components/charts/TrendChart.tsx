@@ -9,7 +9,8 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
-import { COLOR } from "@/lib/theme";
+import { getChartColors } from "@/lib/theme";
+import { useTheme } from "@/components/theme/ThemeProvider";
 import { formatCount } from "@/lib/format";
 
 export interface TrendChartPoint {
@@ -52,44 +53,41 @@ function TrendTooltip({
 
 /** Accepts a small pre-computed series — never a lead collection (Constitution I). */
 export function TrendChart({ data }: { data: TrendChartPoint[] }) {
+  const { theme } = useTheme();
+  const c = getChartColors(theme === "dark");
+
   return (
     <div className="h-64 w-full" role="img" aria-label="Delivered units and leads created by month">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
-          <CartesianGrid stroke={COLOR.grid.light} vertical={false} />
+          <CartesianGrid stroke={c.grid} vertical={false} />
           <XAxis
             dataKey="month"
             tickFormatter={monthLabel}
-            stroke={COLOR.ink.mutedLight}
+            stroke={c.mutedInk}
             tickLine={false}
-            axisLine={{ stroke: COLOR.grid.light }}
+            axisLine={{ stroke: c.grid }}
             fontSize={12}
           />
-          <YAxis
-            stroke={COLOR.ink.mutedLight}
-            tickLine={false}
-            axisLine={false}
-            fontSize={12}
-            width={32}
-          />
+          <YAxis stroke={c.mutedInk} tickLine={false} axisLine={false} fontSize={12} width={32} />
           <Tooltip content={<TrendTooltip />} />
           <Line
             type="monotone"
             dataKey="deliveredUnits"
             name="Delivered"
-            stroke={COLOR.accent}
+            stroke={c.accent}
             strokeWidth={2}
-            dot={{ r: 3, fill: COLOR.accent }}
+            dot={{ r: 3, fill: c.accent }}
             activeDot={{ r: 5 }}
           />
           <Line
             type="monotone"
             dataKey="leadsCreated"
             name="Leads created"
-            stroke={COLOR.ink.mutedLight}
+            stroke={c.mutedInk}
             strokeWidth={2}
             strokeDasharray="4 3"
-            dot={{ r: 3, fill: COLOR.ink.mutedLight }}
+            dot={{ r: 3, fill: c.mutedInk }}
           />
         </LineChart>
       </ResponsiveContainer>

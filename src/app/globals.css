@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* Enables `dark:` utilities keyed off a `.dark` class (ThemeProvider) rather than only
+   `prefers-color-scheme` — needed for a user-controlled toggle independent of OS setting. Most of
+   this file's actual theming happens through the CSS-variable overrides below, not `dark:`
+   utilities, but a few components use the variant directly for things a variable can't express. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans:
     system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -34,13 +40,70 @@ html {
   color-scheme: light;
 }
 
+/*
+ * Dark theme: overrides the same custom-property names `@theme` declares above, not a parallel
+ * set. Tailwind's generated utilities (bg-surface, text-ink-primary, border-grid, ...) already
+ * compile to `var(--color-*)`, so redefining the variable under `.dark` re-themes every one of
+ * them automatically — no component needed a `dark:` prefix added. Values are the dark-mode
+ * members of each pair already carried in lib/theme.ts's COLOR object (sourced from the dataviz
+ * skill's reference palette during T030, computed but left unused when dark mode was originally
+ * deferred — see decision-log.md). `critical`/`warning`/`good` are deliberately absent here: they
+ * stay mode-invariant by design (T030), verified against a dark surface at the time.
+ */
+.dark {
+  color-scheme: dark;
+  --color-accent: #3987e5;
+  --color-accent-hover: #57a6f2;
+  --color-surface: #1a1a19;
+  --color-page: #0d0d0d;
+  --color-ink-primary: #ffffff;
+  --color-ink-secondary: #c3c2b7;
+  --color-ink-muted: #898781;
+  --color-grid: #2c2c2a;
+  --color-baseline: #52514e;
+  --color-border: #ffffff1f;
+}
+
 body {
   background: var(--color-page);
   color: var(--color-ink-primary);
   font-family: var(--font-sans);
+  /* The one deliberately "noticeable" motion in this pass: toggling the theme fades rather than
+     snaps. Everything else is restrained hover/focus feedback (Card, StatTile, links, buttons). */
+  transition:
+    background-color 300ms ease,
+    color 300ms ease;
 }
 
 /* Tabular numerals on every figure (Constitution: "tabular numerals on all figures"). */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 350ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -1,10 +1,13 @@
 "use client";
 
 import { LineChart, Line, ResponsiveContainer } from "recharts";
-import { COLOR } from "@/lib/theme";
+import { getChartColors } from "@/lib/theme";
+import { useTheme } from "@/components/theme/ThemeProvider";
 
 /** Shared compact trend line — used in every table row that needs an at-a-glance recent trend. */
 export function Sparkline({ points }: { points: number[] }) {
+  const { theme } = useTheme();
+  const c = getChartColors(theme === "dark");
   const data = points.map((value, i) => ({ i, value }));
   return (
     <div className="h-8 w-24" aria-hidden="true">
@@ -13,7 +16,7 @@ export function Sparkline({ points }: { points: number[] }) {
           <Line
             type="monotone"
             dataKey="value"
-            stroke={COLOR.accent}
+            stroke={c.accent}
             strokeWidth={2}
             dot={false}
             isAnimationActive={false}

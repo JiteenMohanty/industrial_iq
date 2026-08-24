@@ -85,7 +85,7 @@ export default async function BranchDetailPage({
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="animate-fade-in space-y-8">
       <div>
         <h1 className="text-xl font-semibold text-ink-primary">{branch.label}</h1>
       </div>

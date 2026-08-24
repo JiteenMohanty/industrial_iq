@@ -1,7 +1,8 @@
 "use client";
 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { COLOR } from "@/lib/theme";
+import { getChartColors } from "@/lib/theme";
+import { useTheme } from "@/components/theme/ThemeProvider";
 import type { FunnelStagePoint } from "@/lib/analytics/funnel";
 
 function stageLabel(stage: string): string {
@@ -31,6 +32,9 @@ export function FunnelChart({
   branch?: FunnelStagePoint[];
   branchLabel?: string;
 }) {
+  const { theme } = useTheme();
+  const c = getChartColors(theme === "dark");
+
   const data: ChartRow[] = group.map((g, i) => ({
     stage: stageLabel(g.stage),
     groupPct: g.pctOfTop,
@@ -41,10 +45,10 @@ export function FunnelChart({
     <div className="h-72 w-full" role="img" aria-label="Conversion funnel, percentage of leads reaching each stage">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
-          <CartesianGrid stroke={COLOR.grid.light} vertical={false} />
-          <XAxis dataKey="stage" stroke={COLOR.ink.mutedLight} tickLine={false} fontSize={12} />
+          <CartesianGrid stroke={c.grid} vertical={false} />
+          <XAxis dataKey="stage" stroke={c.mutedInk} tickLine={false} fontSize={12} />
           <YAxis
-            stroke={COLOR.ink.mutedLight}
+            stroke={c.mutedInk}
             tickLine={false}
             axisLine={false}
             fontSize={12}
@@ -58,19 +62,19 @@ export function FunnelChart({
             type="monotone"
             dataKey="groupPct"
             name="Group"
-            stroke={COLOR.ink.mutedLight}
+            stroke={c.mutedInk}
             strokeWidth={2}
             strokeDasharray="4 3"
-            dot={{ r: 3, fill: COLOR.ink.mutedLight }}
+            dot={{ r: 3, fill: c.mutedInk }}
           />
           {branch && (
             <Line
               type="monotone"
               dataKey="branchPct"
               name={branchLabel ?? "Branch"}
-              stroke={COLOR.accent}
+              stroke={c.accent}
               strokeWidth={2}
-              dot={{ r: 3, fill: COLOR.accent }}
+              dot={{ r: 3, fill: c.accent }}
               activeDot={{ r: 5 }}
             />
           )}

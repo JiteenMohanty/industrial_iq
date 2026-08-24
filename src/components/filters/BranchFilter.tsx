@@ -38,7 +38,7 @@ export function BranchFilter({ branches }: { branches: readonly BranchOption[] }
         id="branch-select"
         value={currentBranch}
         onChange={(e) => handleSelect(e.target.value)}
-        className="rounded-md border border-border bg-surface px-2 py-1 text-sm text-ink-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+        className="rounded-md border border-border bg-surface px-2 py-1 text-sm text-ink-primary transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
       >
         <option value="">All branches</option>
         {branches.map((b) => (

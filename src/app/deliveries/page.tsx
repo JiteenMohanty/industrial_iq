@@ -54,7 +54,7 @@ export default async function DeliveriesPage({
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="animate-fade-in space-y-8">
       <section aria-label="Stuck order summary" className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <StatTile
           label="Value stuck in undelivered orders"
