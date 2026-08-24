@@ -1,0 +1,84 @@
+import { cache } from "react";
+import { getDataset } from "@/lib/data/dataset";
+import type { Dataset, EnrichedLead, EnrichedDelivery } from "@/lib/data/types";
+import type { Filters } from "@/lib/filters/types";
+import { applyFilters, byBranch, byCreatedWindow, byDeliveryWindow } from "@/lib/filters/apply";
+import { daysBetween, addDays } from "@/lib/time";
+
+/**
+ * The single input to every analytics and insight function. Three scopes, deliberately kept
+ * distinct (ADR-0005) — confusing them is the single most likely correctness bug in this codebase:
+ *
+ *   - leads/deliveries       window-scoped: respects BOTH the time range and the branch filter.
+ *                            Leads filter on created_at, deliveries on delivery_date (FR-030).
+ *   - detectionLeads         branch-filtered only. Time range is deliberately NOT applied, so a
+ *                            narrow window never hides an active problem (FR-009), while a branch
+ *                            selection still scopes the alert feed (FR-009a).
+ *   - groupLeads/Deliveries  never filtered by anything. The baseline every comparative insight
+ *                            (contact-rate, funnel-collapse, rep-outlier, channel-quality) is
+ *                            measured against, so the comparison stays visible even in a
+ *                            branch-narrowed view.
+ */
+export interface AnalyticsContext {
+  filters: Filters;
+
+  leads: EnrichedLead[];
+  deliveries: EnrichedDelivery[];
+  priorLeads: EnrichedLead[];
+  priorDeliveries: EnrichedDelivery[];
+  hasPriorPeriod: boolean;
+
+  detectionLeads: EnrichedLead[];
+
+  groupLeads: EnrichedLead[];
+  groupDeliveries: EnrichedDelivery[];
+
+  dataset: Dataset;
+  asOf: Date;
+}
+
+function computePriorWindow(filters: Filters, minDate: Date): { from: Date; to: Date } | null {
+  const windowDays = daysBetween(filters.from, filters.to);
+  const priorTo = addDays(filters.from, -1);
+  const priorFrom = addDays(priorTo, -windowDays);
+
+  if (priorFrom < minDate) {
+    return null;
+  }
+  return { from: priorFrom, to: priorTo };
+}
+
+export const buildContext = cache((filters: Filters): AnalyticsContext => {
+  const dataset = getDataset();
+
+  const { leads, deliveries } = applyFilters(dataset.leads, dataset.deliveries, filters);
+
+  const priorWindow = computePriorWindow(filters, dataset.minCreatedAt);
+  let priorLeads: EnrichedLead[] = [];
+  let priorDeliveries: EnrichedDelivery[] = [];
+  if (priorWindow) {
+    const inBranch = byBranch(filters.branchId);
+    priorLeads = dataset.leads.filter(
+      (l) => inBranch(l) && byCreatedWindow(priorWindow.from, priorWindow.to)(l),
+    );
+    priorDeliveries = dataset.deliveries.filter(
+      (d) => inBranch(d.lead) && byDeliveryWindow(priorWindow.from, priorWindow.to)(d),
+    );
+  }
+
+  const detectionLeads = dataset.leads.filter(byBranch(filters.branchId));
+
+  return {
+    filters,
+    leads,
+    deliveries,
+    priorLeads,
+    priorDeliveries,
+    hasPriorPeriod: priorWindow !== null,
+    detectionLeads,
+    groupLeads: dataset.leads,
+    groupDeliveries: dataset.deliveries,
+    dataset,
+    asOf: dataset.dataAsOf,
+  };
+});

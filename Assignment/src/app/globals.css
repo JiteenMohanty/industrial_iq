@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans:
+    system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --color-accent: #2a78d6;
+  --color-accent-hover: #1c5cab;
+
+  --color-critical: #d03b3b;
+  --color-warning: #fab219;
+  --color-good: #0ca30c;
+
+  --color-surface: #fcfcfb;
+  --color-page: #f9f9f7;
+  --color-ink-primary: #0b0b0b;
+  --color-ink-secondary: #52514e;
+  --color-ink-muted: #898781;
+  --color-grid: #e1e0d9;
+  --color-baseline: #c3c2b7;
+  --color-border: #0b0b0b1a;
+
+  --color-series-1: #2a78d6;
+  --color-series-2: #eb6834;
+  --color-series-3: #1baf7a;
+  --color-series-4: #eda100;
+  --color-series-5: #e87ba4;
+  --color-series-6: #008300;
+  --color-series-7: #4a3aa7;
+  --color-series-8: #e34948;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-page);
+  color: var(--color-ink-primary);
+  font-family: var(--font-sans);
+}
+
+/* Tabular numerals on every figure (Constitution: "tabular numerals on all figures"). */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
