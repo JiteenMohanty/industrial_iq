@@ -1,7 +1,8 @@
 # Decisions
 
-This is the reviewer-facing narrative: what DealerPulse is, the choices that shaped it, and the
-evidence that the analytics are correct rather than assumed. It is curated, not exhaustive — the
+This is the reviewer-facing narrative: what DealerPulse is, the choices that shaped it, the evidence
+that the analytics are correct rather than assumed, what the data turned out to be hiding, and what
+would come next with more time. It is curated, not exhaustive — the
 full chronological record of every implementation decision (including the ones that didn't make
 the cut here) lives in [`docs/decisions/decision-log.md`](./docs/decisions/decision-log.md), and
 the formal architecture decisions are in
@@ -100,6 +101,157 @@ became test fixtures:
 The pattern across all four: a number was checked against the real dataset (or the real shipped
 code) before being trusted, not after.
 
+## What the data actually says
+
+The headline finding above — Lakeside's contact rate — was visible on a first pass through the
+dataset. The patterns below were not. They surfaced on a second pass, using AI to collapse 510
+leads and their nested status histories down into small cross-tabs: contact rate against lead
+load, step-conversion against the group, never-contacted rate against source, deal value and rep.
+At 510 rows nothing announces itself; at ten rows a shape either appears or it does not. Several
+of these sharpen the product's story. One of them corrects it.
+
+### 1. Lakeside delivered six cars in seven months
+
+| Branch | Target units | Delivered | Attainment |
+|---|---:|---:|---:|
+| Eastside Toyota | 313 | 47 | 15.0% |
+| Downtown Toyota | 315 | 40 | 12.7% |
+| Central Toyota | 244 | 31 | 12.7% |
+| Highway Toyota | 290 | 36 | 12.4% |
+| **Lakeside Toyota** | **264** | **6** | **2.3%** |
+
+Four branches sit inside a 2.6-point band. Lakeside is five times worse than the next worst. The
+targets are unusable as an absolute measure — see pattern 8 — but the spread between branches
+measured on the same unusable basis is perfectly meaningful, and "six cars in seven months" is the
+most legible single statement of the problem anywhere in this dataset.
+
+### 2. Lakeside does not leak at one stage — it leaks at every stage
+
+| Transition | Group | Lakeside | Gap |
+|---|---:|---:|---:|
+| new → contacted | 76.7% | 58.2% | −18.5pp |
+| contacted → test drive | 76.7% | 58.7% | −18.0pp |
+| test drive → negotiation | 78.3% | 51.9% | −26.4pp |
+| negotiation → order placed | 84.3% | 71.4% | −12.9pp |
+| order placed → delivered | 80.8% | 60.0% | −20.8pp |
+
+The product's own funnel-collapse rule reports that *Lakeside's funnel collapses at negotiation*,
+because negotiation is the single widest gap. That framing is imprecise, and it is worth saying so
+plainly rather than leaving a reviewer to find it: there is no collapse point. The branch converts
+13 to 26 points below the group at every one of the five transitions. A single-stage collapse would
+imply a training gap at one specific skill; a uniform shortfall across the entire journey points at
+branch management instead. The rule is doing exactly what it was specified to do — find the worst
+stage — but the honest diagnosis is the one the whole table gives, not the one the rule reports.
+
+### 3. It is not lead quality, and it is not capacity — both were tested and eliminated
+
+**Lead quality is ruled out.** Lakeside's acquisition mix is unremarkable: 23% website, 20%
+walk-in, 16% referral, 13% social media. Central Toyota draws 22% of its leads from social media —
+the worst-converting channel in the group — and still contacts 81.6% of them. Average deal value
+is ₹24.8L at Lakeside against ₹21.6L–₹25.5L elsewhere. Same leads, same money.
+
+**Capacity is ruled out, and the table inverts the expected relationship.**
+
+| Branch | Sales officers | Leads | Leads per officer | Contact rate |
+|---|---:|---:|---:|---:|
+| **Lakeside Toyota** | 5 | 79 | **15.8** | **58.2%** |
+| Downtown Toyota | 6 | 97 | 16.2 | 82.5% |
+| Highway Toyota | 5 | 109 | 21.8 | 78.9% |
+| Central Toyota | 4 | 98 | 24.5 | 81.6% |
+| Eastside Toyota | 5 | 127 | 25.4 | 78.0% |
+
+Lakeside carries the lightest load in the group and posts the worst contact rate. Eastside carries
+60% more leads per officer and contacts 78% of them. "The branch is overwhelmed" is not available
+as an explanation.
+
+What is left is specific people. Two of Lakeside's five officers account for 20 of its 33
+never-contacted leads — Vikram Patel at 8 of 12, Venkat Mishra at 12 of 22 — while a third,
+Kavitha Joshi, sits at 3 of 13, near the group norm. The branch-level alert is real, but its cause
+is two individuals rather than a location. See *What I'd build next* for the rule this implies.
+
+### 4. Follow-up is binary: roughly three days, or never
+
+| Time to first contact | Leads |
+|---|---:|
+| Under 1 day | 45 |
+| 1–2 days | 160 |
+| 2–4 days | 186 |
+| More than 4 days | **0** |
+
+Not one lead in the dataset was first contacted later than 3.3 days after it arrived. There is no
+slow middle: a lead is either worked inside a three-day window or abandoned at intake.
+
+That has a direct design consequence. A conventional "leads aging without contact" alert — the kind
+most CRM dashboards ship — would find nothing here, because no lead ever ages into it. The only
+useful form of the alert is the binary one this product implements, and the intervention it implies
+is operational rather than motivational: something drops leads on the floor at assignment time,
+rather than reps failing to chase them afterwards.
+
+### 5. The largest single loss category in the business is leads nobody called
+
+119 of 510 leads (23.3%) never reached the contacted stage, carrying **₹28.61 Cr** of deal value.
+112 of them are already lost, which is **40.9% of all 274 genuine losses** in the dataset. Only 7
+remain open and therefore recoverable.
+
+Worth stating against the product's own framing: this is a group problem, not a Lakeside problem.
+Lakeside is worst at 41.8%, but the best-performing branch still never contacts 17.5% of what it
+receives. The dashboard leads with Lakeside because Lakeside is the actionable outlier — a manager
+can move it this week. The larger and slower finding is that the group as a whole discards roughly
+a quarter of its demand before speaking to it once.
+
+### 6. Deal value does not drive follow-up priority
+
+| Deal value quintile | Delivered | Never contacted |
+|---|---:|---:|
+| Q1 ₹7.5L–₹10.0L | 35.3% | 22.5% |
+| Q2 ₹10.0L–₹16.8L | 28.4% | 26.5% |
+| Q3 ₹16.8L–₹25.1L | 24.5% | 25.5% |
+| Q4 ₹25.2L–₹38.5L | **38.2%** | **15.7%** |
+| Q5 ₹38.9L–₹56.0L | 30.4% | **26.5%** |
+
+Reps work the ₹25–38L band hardest — best conversion, lowest neglect. But the most expensive leads
+in the business, the ₹39–56L quintile, are ignored at 26.5%, indistinguishable from the cheapest
+quintile. No value-based triage is happening anywhere in the group. Of everything here this is the
+cheapest to act on, because it is a queueing policy rather than a hiring or training problem.
+
+### 7. Stuck orders are not late — they are abandoned
+
+The 38 undelivered placed orders carry ₹8.59 Cr against a median order-to-delivery time of 17 days.
+24 of the 38 have had no recorded activity for 30 days or more; 11 have been silent for over 90;
+three are older than 180 days. The oldest, `L0022` at Lakeside, is 195 days old and worth ₹50.5L.
+These are not deliveries running late — they are deals nobody ever closed out.
+
+A related consequence for reading the Overview: half the group's open pipeline is these orders. 38
+of the 76 open leads are stuck orders, so ₹8.59 Cr of the ₹18.35 Cr open-pipeline figure is not a
+live pipeline in any useful sense.
+
+### 8. The dataset is synthetic — and three detection rules correctly find nothing because of it
+
+| Transition | n | Median | p90 | Max |
+|---|---:|---:|---:|---:|
+| new → contacted | 391 | 1.9d | 2.9d | **3.3d** |
+| contacted → test drive | 300 | 5.9d | 9.3d | **10.2d** |
+| test drive → negotiation | 235 | 3.8d | 6.5d | **7.3d** |
+| negotiation → order placed | 198 | 8.3d | 13.4d | **14.3d** |
+| order placed → delivered | 160 | 17.0d | 29.0d | **39.0d** |
+
+Every transition has a hard ceiling and effectively no tail. Real sales pipelines are heavily
+right-skewed — some customer always takes four months to decide. These are bounded draws. The same
+signature appears elsewhere: the eight loss reasons are near-uniform, every one falling between
+8.8% and 14.6%, and the seven delivery-delay reasons top out at 25%. The monthly targets carry it
+too — every branch was handed 35–45 units a month regardless of its size or its history, against
+actual output ranging from 1.0 to 7.8 a month.
+
+This is the direct explanation for why three of the nine detection rules — rep outlier,
+lost-reason concentration, delivery-delay concentration — return nothing on this extract. It is not
+a threshold miscalibration; there is no concentration in the data to find, and the tests assert
+exactly that rather than having their thresholds lowered until something appeared.
+
+It also bounds a claim the product makes elsewhere. The 7/14/30-day cold-lead steps and the 27-day
+stuck-order mark were calibrated against a distribution with no tail; against production data
+carrying real long tails they would fire very differently and would need review. The spec already
+records this as an explicit assumption, and pattern 4 is what it looks like in practice.
+
 ## Known limitations
 
 Stated plainly rather than left for a reviewer to discover:
@@ -126,3 +278,63 @@ Stated plainly rather than left for a reviewer to discover:
   branch in this dataset naturally exercises that empty-state path today. The code handles it
   correctly (`InsightFeed`'s branch-aware message); it simply has no real case in this dataset to
   demonstrate it against.
+- **Conversion rate for a recently-created cohort is right-censored, and the product does not
+  say so.** Lead counts are scoped by `created_at` (FR-030) and the median lead-to-delivery journey
+  runs 37.7 days, so a reader selecting December 2025 sees a conversion rate of 1.3% against 27–43%
+  for June through November — not because the business collapsed, but because December's leads had
+  not had time to convert before the data ends on 31 December. The figure is arithmetically correct
+  and materially misleading. A cohort-maturity note on any window ending within roughly 45 days of
+  `DATA_AS_OF` is the fix; it is not in this build.
+
+## What I'd build next
+
+Everything in this build is deterministic by design: nine fixed rules, pure functions, byte-identical
+output for a given dataset and filter set. That was a sequencing decision rather than a position on
+AI. The constitution's ban on a probabilistic insight path and its refusal to forecast against the
+target figures both exist to protect the same property — that every rupee figure on screen traces
+back to an arithmetic rule a reviewer can check. With that base built and tested, the next tier of
+work is the generative one, layered **on top of** the verified numbers rather than in place of them.
+
+**Forecasting — against demonstrated capacity, not against the targets.** The reason this build
+shows no forecast is not that forecasting is unwelcome; it is that the only baseline on offer is a
+set of targets carrying zero information about the branches they were assigned to (pattern 8: every
+branch handed 35–45 units a month, against actual output of 1.0 to 7.8). Projecting against that
+produces an authoritative-looking number that means nothing. The version worth building projects
+each branch's own trailing run-rate and current pipeline composition forward — given this branch's
+open negotiation and order-placed volume, at its own historical step-conversion rates, does it land
+above or below last month — and reports the official target alongside as the fiction it is, rather
+than as the denominator.
+
+**What-if scenarios on the funnel.** The step-conversion table in pattern 2 is already exactly the
+input a scenario tool needs. *If Lakeside contacted its leads at the group's rate instead of 58.2%,
+what is that worth?* is answerable from figures the product computes today: lifting 58.2% to the
+group's 76.7% puts roughly 15 more leads into the funnel, which at the group's 40.9%
+contacted-to-delivered rate and Lakeside's ₹24.8L average deal is about **₹1.5 Cr**. Turning that
+from a back-of-envelope calculation into a control is what moves the Action Center from a diagnosis
+to an argument for a specific intervention with a number attached.
+
+**AI summaries — narrating verified numbers, never computing them.** The constraint worth keeping
+from Principle II is narrower than "no LLM": the model receives the already-computed `Insight`
+objects — severity, entity, rupee impact, evidence IDs — and turns them into prose. It never reads
+the dataset and never originates a figure. That preserves the property this build was designed
+around, while removing the one thing the Action Center genuinely lacks: a paragraph a CEO can read
+without parsing nine cards. The patterns section above is a fair illustration of the shape — those
+findings became visible once the dataset was reduced to small, checkable cross-tabs, which is
+precisely the work a model does well when it sits on top of a verified base instead of replacing it.
+
+**Three smaller things, each surfaced by the analysis above:**
+
+- **A rep-level contact-rate rule.** The existing rep-outlier rule measures *delivery conversion*,
+  where Lakeside's officers are uniformly poor (a 6.6pp spread), so it correctly returns nothing.
+  Measured on *contact rate* instead, it would fire immediately on Vikram Patel (8 of 12 never
+  contacted) and Venkat Mishra (12 of 22) — the two people behind 20 of Lakeside's 33. This is
+  roughly twenty lines against the existing rule interface and it converts the branch alert into a
+  named, coachable one.
+- **A cohort-maturity guard on recent time windows.** See Known limitations — a reader selecting
+  December currently sees a 1.3% conversion rate that is arithmetically correct and materially
+  misleading. Any window ending within about 45 days of the data's coverage date should carry a
+  note that its cohort has not matured.
+- **An evidence lead-list view.** An alert's *View evidence* link currently lands on the branch
+  page, which shows that branch's metrics, alerts, funnel and reps — but not the 33 leads
+  themselves. The call-list CSV is the real evidence path today. A filtered lead table at
+  `/leads?insight=<id>` would close that gap in-product, and is the most obviously missing route.
