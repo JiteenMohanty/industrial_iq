@@ -324,3 +324,117 @@ export function heatmapHighlights(matrix: HeatmapMatrix): {
         : null,
   };
 }
+
+// ------------------------------------------------------------------------------------------
+// Seasonality
+// ------------------------------------------------------------------------------------------
+
+export interface SeasonPoint {
+  month: string;
+  label: string;
+  leadsCreated: number;
+  unitsDelivered: number;
+  revenueRupees: number;
+  /** Percent above or below the monthly mean for that measure. Null when there is no mean. */
+  demandVsMeanPct: number | null;
+  salesVsMeanPct: number | null;
+}
+
+export interface Seasonality {
+  points: SeasonPoint[];
+  meanLeadsPerMonth: number | null;
+  meanUnitsPerMonth: number | null;
+  /** The month the most enquiries arrived. */
+  peakDemand: SeasonPoint | null;
+  /** The month the most cars were actually handed over. */
+  peakSales: SeasonPoint | null;
+  /** Whole months between the demand peak and the sales peak. */
+  lagMonths: number | null;
+  /** Median lead-to-delivery days across the same pool — what the lag should be, if it is real. */
+  medianCycleDays: number | null;
+}
+
+const MONTH_LABELS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+function labelOf(month: string): string {
+  const [y, m] = month.split("-");
+  return `${MONTH_LABELS[Number(m) - 1] ?? m} ${(y ?? "").slice(2)}`;
+}
+
+/**
+ * When demand arrives, and when it turns into handed-over cars.
+ *
+ * Scope note: branch-scoped, but deliberately **not** time-scoped — the same class as the gates.
+ * A seasonality view filtered to one month would report that month as its own peak, which is
+ * true, circular, and useless. The page states this basis rather than leaving a reader to wonder
+ * why the time control did nothing here.
+ *
+ * The two peaks are reported separately on purpose. Enquiries and deliveries peak in different
+ * months, and the gap between them is the sales cycle — so a dealership planning stock or staffing
+ * around "our best month" needs to know which of the two it means.
+ */
+export function computeSeasonality(ctx: AnalyticsContext): Seasonality {
+  const leads = ctx.detectionLeads;
+  const deliveredLeads = leads.filter((l) => l.delivery !== null);
+
+  const points: SeasonPoint[] = ctx.dataset.months.map((month) => {
+    const created = leads.filter((l) => l.createdAt.toISOString().slice(0, 7) === month);
+    const delivered = deliveredLeads.filter((l) => l.delivery?.deliveryMonth === month);
+    return {
+      month,
+      label: labelOf(month),
+      leadsCreated: created.length,
+      unitsDelivered: delivered.length,
+      revenueRupees: delivered.reduce((s, l) => s + l.dealValue, 0),
+      demandVsMeanPct: null,
+      salesVsMeanPct: null,
+    };
+  });
+
+  if (points.length === 0) {
+    return {
+      points,
+      meanLeadsPerMonth: null,
+      meanUnitsPerMonth: null,
+      peakDemand: null,
+      peakSales: null,
+      lagMonths: null,
+      medianCycleDays: null,
+    };
+  }
+
+  const meanLeads = mean(points.map((p) => p.leadsCreated));
+  const meanUnits = mean(points.map((p) => p.unitsDelivered));
+
+  for (const p of points) {
+    p.demandVsMeanPct =
+      meanLeads && meanLeads > 0 ? (p.leadsCreated / meanLeads - 1) * 100 : null;
+    p.salesVsMeanPct =
+      meanUnits && meanUnits > 0 ? (p.unitsDelivered / meanUnits - 1) * 100 : null;
+  }
+
+  const peakDemand = [...points].sort((a, b) => b.leadsCreated - a.leadsCreated)[0] ?? null;
+  const peakSales = [...points].sort((a, b) => b.unitsDelivered - a.unitsDelivered)[0] ?? null;
+
+  let lagMonths: number | null = null;
+  if (peakDemand && peakSales) {
+    const idxDemand = points.findIndex((p) => p.month === peakDemand.month);
+    const idxSales = points.findIndex((p) => p.month === peakSales.month);
+    lagMonths = idxSales - idxDemand;
+  }
+
+  return {
+    points,
+    meanLeadsPerMonth: meanLeads,
+    meanUnitsPerMonth: meanUnits,
+    peakDemand,
+    peakSales,
+    lagMonths,
+    medianCycleDays: median(
+      deliveredLeads.map((l) => l.cycleDays).filter((v): v is number => v !== null),
+    ),
+  };
+}

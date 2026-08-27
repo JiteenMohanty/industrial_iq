@@ -211,6 +211,26 @@ sends bad leads" from "we never worked this channel's leads".
   judges. Comparing a branch's November contact rate against an all-time group figure compares two
   different populations.
 
+**Seasonality and head-to-head (added post-review)**
+
+- **FR-113**: The demand view MUST report the peak *selling* month and the peak *enquiry* month
+  separately, together with the lag between them, because they do not coincide and a dealership
+  planning stock around "our best month" needs to know which it means.
+- **FR-113a**: Seasonality MUST be branch-scoped but NOT time-scoped. A seasonality view narrowed
+  to one month would name that month as its own peak — true, circular and useless.
+- **FR-113b**: Any real-world calendar context offered alongside the pattern (a festival date, a
+  fiscal year end) MUST be labelled as external to the dataset, and MUST NOT be stated more
+  strongly than the data supports. Where the data shows a broad multi-month elevation rather than a
+  single-week spike, the copy MUST say so.
+- **FR-114**: The demand headline row MUST include the top-selling model by units delivered,
+  distinct from the top model by revenue and the top model by enquiry volume — the three are
+  different vehicles in this dataset and conflating them hides the mix finding.
+- **FR-121**: The rep view MUST present a direct best-versus-worst comparison across a shared
+  metric set with the gap stated per metric, and MUST identify which gate the widest gap opens at.
+- **FR-121a**: Both ends of that comparison MUST clear the benchmark sample floor. Where fewer than
+  two reps qualify, the view MUST render an empty state naming the floor rather than comparing thin
+  books or silently disappearing.
+
 **Filter scope contract**
 
 - **FR-144**: Every analytics function MUST have a deliberate, documented answer to whether it

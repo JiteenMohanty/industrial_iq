@@ -28,7 +28,11 @@ export function formatCurrency(rupees: number): string {
   if (abs >= ONE_LAKH) {
     return `${sign}₹${(abs / ONE_LAKH).toFixed(2)} L`;
   }
-  return `${sign}₹${indianGrouping.format(abs)}`;
+  // Rounded to whole rupees. This branch used to be unreachable — the smallest deal value in the
+  // dataset is ₹7.5 L — so it went unnoticed that `Intl` happily renders the fractional part. The
+  // rep head-to-head made it reachable (revenue per lead can fall below ₹1 lakh) and it surfaced
+  // as "₹45,909.091", which is three decimal places of false precision on a derived average.
+  return `${sign}₹${indianGrouping.format(Math.round(abs))}`;
 }
 
 /** Plain count with Indian digit grouping — e.g. 1,426. */

@@ -1582,3 +1582,61 @@ comparison tables. The three-class model keeps both properties and makes each on
 detection rule by projecting `computeSourcePerformance`. Once the latter became time-scoped, the
 rule would have inherited the reader's time window and silently stopped firing under a narrow one.
 Split into its own detection-scoped pass and pinned by a test asserting it ignores the time filter.
+
+## 2026-08-27 · Phase 9 · T300–T302 — Seasonality: verify before writing the copy
+
+**Decision**: Report the peak enquiry month and the peak delivery month separately, with the lag
+between them, and label the festival date as context external to the dataset.
+
+**Reasoning**: The request suggested October as the likely peak, on the reasonable assumption that
+Diwali drives Indian auto demand. The data says something more interesting. Enquiries peak in
+November (95, +30% against the monthly mean) and again run high in October (90); deliveries peak in
+December (52, +127%). The one-month lag is exactly what a 38-day median sales cycle predicts, so the
+festive-quarter surge is an October–November demand event handed over as December revenue.
+
+Reported as two peaks rather than one because a dealership planning stock or delivery capacity needs
+the delivery peak, while one planning contact and test-drive capacity needs the enquiry peak — and
+they are different months.
+
+**On the Diwali claim specifically**: checked at weekly granularity before writing anything. Diwali
+2025 fell on 20 October, inside the enquiry peak, but weekly volume is broadly elevated across the
+whole of October and November (weeks running 22–76% above the weekly mean) rather than spiking in
+any single week. So the copy states a festive-*quarter* reading, names the festival date explicitly
+as context the dataset does not contain, and does not assert a single-festival cause. Writing
+"Diwali drove the peak" would have been a plausible-sounding claim the data does not support — the
+exact failure mode the constitution's honesty principle exists to prevent.
+
+**Scope**: branch-scoped, not time-scoped. A seasonality view narrowed to one month would name that
+month as its own peak. Added to the filter-scope contract with that reason recorded.
+
+## 2026-08-27 · Phase 9 · T304–T307 — Rep head-to-head replaces three disconnected callouts
+
+**Decision**: Replace the "hidden by volume / volume without conversion / the coachable number"
+callouts with a single best-versus-worst comparison across a shared metric set.
+
+**Reasoning**: The three callouts each named a different rep for a different reason. Individually
+each was true and mildly interesting; together they never answered the question a sales manager
+actually asks, which is *what separates my best rep from my worst?* A comparison answers it directly,
+and because both ends are ranked on the same stated basis the reader can check the judgement rather
+than taking three separate assertions on trust.
+
+Ranked on revenue per lead, not total revenue: total revenue rewards whoever was handed the biggest
+book. The benchmark sample floor (15 leads) applies to both ends — without it first place goes to a
+14-lead rep whose per-lead figure is the highest in the group but rests on the smallest sample. On
+this dataset the comparison lands on two reps with near-identical books (25 leads vs 22), which is
+the strongest possible form of it: the difference in outcome cannot be explained by workload.
+
+The widest gap is at the test-drive gate (50 points), which ties the rep view back to the product's
+central thesis without any hand-authored narrative — the gap is computed and the gate is identified
+from the numbers.
+
+**Empty state**: inside a single month no officer clears the 15-lead floor, so the comparison
+correctly returns null. Rather than the section silently disappearing, it renders an empty state
+naming the floor and why it exists. Pinned by a test asserting null for a month and non-null for the
+full range.
+
+**Defect found while building it**: `formatCurrency`'s sub-₹1-lakh branch never rounded. It had been
+unreachable — the smallest monetary figure anywhere in the product was a deal value, minimum ₹7.5 L —
+until revenue per lead made it live, at which point it rendered `₹45,909.091`: three decimal places
+of false precision on a derived average. Rounded, and given a regression test covering the branch
+and both threshold boundaries.

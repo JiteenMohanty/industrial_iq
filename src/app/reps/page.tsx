@@ -1,15 +1,17 @@
 import { resolvePage, type SearchParams } from "@/lib/filters/page-context";
 import { buildHref } from "@/lib/filters/parse";
-import { computeRepPerformance } from "@/lib/analytics/reps";
+import { computeRepPerformance, computeRepHeadToHead } from "@/lib/analytics/reps";
 import { computeGates } from "@/lib/analytics/gates";
-import { median, statusVsGroup, rankBy, rate } from "@/lib/analytics/benchmark";
+import { median, statusVsGroup, rankBy, rate, BENCHMARK } from "@/lib/analytics/benchmark";
 import { formatCount, formatCurrency, formatPercent } from "@/lib/format";
 import { Card, SectionHeading } from "@/components/ui/Card";
 import { Callout, Figure } from "@/components/ui/Callout";
 import { DataTable, type Column, MetricBar } from "@/components/ui/DataTable";
 import { StatusDot, RankBadge } from "@/components/ui/Badge";
 import { StatTile } from "@/components/ui/StatTile";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { RepScatter } from "@/components/charts/RepScatter";
+import { RepHeadToHead } from "@/components/charts/RepHeadToHead";
 import { RankedBar } from "@/components/charts/RankedBar";
 
 export const metadata = { title: "Sales reps · DealerPulse" };
@@ -48,16 +50,7 @@ export default async function RepsPage({
   const maxRevPerLead = Math.max(...officers.map((r) => r.revenuePerLeadRupees ?? 0), 1);
   const maxRevenue = Math.max(...officers.map((r) => r.revenueRupees), 1);
 
-  // The two readings a ranked table cannot give you.
-  const efficiencyStar = [...officers]
-    .filter((r) => r.leadCount < medLeads)
-    .sort((a, b) => (b.conversionPct ?? 0) - (a.conversionPct ?? 0))[0];
-  const volumeNoConversion = [...officers]
-    .filter((r) => r.leadCount >= medLeads)
-    .sort((a, b) => (a.conversionPct ?? 0) - (b.conversionPct ?? 0))[0];
-  const worstGate = [...officers]
-    .filter((r) => r.contactedCount >= 5)
-    .sort((a, b) => (a.testDriveRatePct ?? 100) - (b.testDriveRatePct ?? 100))[0];
+  const headToHead = computeRepHeadToHead(ctx);
 
   const columns: Column<(typeof officers)[number]>[] = [
     {
@@ -205,52 +198,79 @@ export default async function RepsPage({
         </Card>
       </section>
 
-      <section aria-label="Rep readings" className="grid gap-4 lg:grid-cols-3">
-        {efficiencyStar && (
-          <Callout
-            tone="good"
-            label="Hidden by volume"
-            href={buildHref(`/reps/${efficiencyStar.repId}`, filters)}
-            linkText={`Open ${efficiencyStar.repName}`}
-          >
-            <Figure>{efficiencyStar.repName}</Figure> carries only{" "}
-            <Figure>{formatCount(efficiencyStar.leadCount)}</Figure> leads — below the median load —
-            yet converts <Figure>{formatPercent(efficiencyStar.conversionPct ?? 0)}</Figure> of them
-            and returns{" "}
-            <Figure>{formatCurrency(efficiencyStar.revenuePerLeadRupees ?? 0)}</Figure> per lead. A
-            revenue leaderboard buries this rep; the question is whether they can take more volume.
-          </Callout>
-        )}
-        {volumeNoConversion && (
-          <Callout
-            tone="critical"
-            label="Volume without conversion"
-            href={buildHref(`/reps/${volumeNoConversion.repId}`, filters)}
-            linkText={`Open ${volumeNoConversion.repName}`}
-          >
-            <Figure>{volumeNoConversion.repName}</Figure> holds{" "}
-            <Figure>{formatCount(volumeNoConversion.leadCount)}</Figure> leads at or above the
-            median load but converts{" "}
-            <Figure>{formatPercent(volumeNoConversion.conversionPct ?? 0)}</Figure>. Every extra
-            lead routed here is worth less than the same lead routed elsewhere.
-          </Callout>
-        )}
-        {worstGate && (
-          <Callout
-            tone="neutral"
-            label="The coachable number"
-            href={buildHref(`/reps/${worstGate.repId}`, filters)}
-            linkText={`Open ${worstGate.repName}`}
-          >
-            <Figure>{worstGate.repName}</Figure> gets only{" "}
-            <Figure>{formatPercent(worstGate.testDriveRatePct ?? 0)}</Figure> of contacted leads into
-            a car, against a group rate of{" "}
-            <Figure>{groupTd === null ? "—" : formatPercent(groupTd)}</Figure>. Since no lead has
-            ever been delivered without a test drive, this is the single most improvable number on
-            this page.
-          </Callout>
-        )}
-      </section>
+      {!headToHead && (
+        <section aria-label="Top versus bottom performer">
+          <Card>
+            <SectionHeading title="Best against worst" />
+            <EmptyState
+              title={`No rep carries ${BENCHMARK.minSample} or more leads in this selection`}
+              body="A best-versus-worst ranking needs enough leads at both ends to mean anything. Inside a single month the group's leads spread thinly enough across 25 officers that none clears the floor, so ranking them would be comparing a handful of leads against a handful. Widen the time range to compare."
+            />
+          </Card>
+        </section>
+      )}
+
+      {headToHead && (
+        <section aria-label="Top versus bottom performer">
+          <Card>
+            <SectionHeading
+              title="Best against worst"
+              hint={`Ranked by revenue per lead among the ${formatCount(headToHead.poolSize)} sales officers carrying ${headToHead.minSample} or more leads. Total revenue would only reward whoever was handed the biggest book; the minimum sample keeps a lucky handful of leads out of either end.`}
+            />
+            <RepHeadToHead
+              data={headToHead}
+              hrefFor={(repId) => buildHref(`/reps/${repId}`, filters)}
+            />
+
+            <div className="mt-4 grid gap-3 border-t border-grid pt-4 lg:grid-cols-2">
+              <Callout tone="accent" label="Where the gap opens">
+                {headToHead.widestGate ? (
+                  <>
+                    The widest single gap is at the{" "}
+                    <Figure>{headToHead.widestGate.label}</Figure> gate —{" "}
+                    <Figure>{Math.round(headToHead.widestGate.gapPoints)} points</Figure> between
+                    them.{" "}
+                    {headToHead.widestGate.key === "close" ? (
+                      <>
+                        Both reps work their leads to a test drive at broadly similar rates; the
+                        difference is in what happens at the table.
+                      </>
+                    ) : (
+                      <>
+                        That is upstream of any negotiating skill. By the time either rep reaches a
+                        negotiation the outcome is largely already decided, because the size of the
+                        pool they are negotiating over was fixed before it.
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <>Not enough delivered volume at one end to locate the gap at a single gate.</>
+                )}
+              </Callout>
+
+              <Callout tone="neutral" label="Like-for-like">
+                {headToHead.top.repName} carries{" "}
+                <Figure>{formatCount(headToHead.top.leadCount)}</Figure> leads against{" "}
+                {headToHead.bottom.repName}&apos;s{" "}
+                <Figure>{formatCount(headToHead.bottom.leadCount)}</Figure>
+                {Math.abs(headToHead.top.leadCount - headToHead.bottom.leadCount) <= 5 ? (
+                  <>
+                    {" "}
+                    — near-identical books, so the difference in outcome is not explained by
+                    workload. Whatever separates them, it is not how many leads they were given.
+                  </>
+                ) : (
+                  <>
+                    {" "}
+                    — different book sizes, which is exactly why the ranking uses revenue per lead
+                    rather than revenue. The rate columns above are unaffected by book size.
+                  </>
+                )}
+              </Callout>
+            </div>
+          </Card>
+        </section>
+      )}
 
       <section aria-label="Rep benchmark table">
         <Card>

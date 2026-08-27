@@ -129,6 +129,15 @@ unfalsifiable. So every judgement is "ahead of / behind *this group*", and the g
 printed beside it. Entities below 15 leads get no mark at all rather than a caveated one — a rep
 with nine leads is not "underperforming", they are unmeasured.
 
+**Two peaks, not one, on the demand view.** Enquiries peak in November and deliveries peak in
+December — one month apart, which is what the 38-day median sales cycle predicts. Reported
+separately because a dealership planning stock needs the delivery peak while one planning contact
+and test-drive capacity needs the enquiry peak, and collapsing them into "our best month" hides
+which is which. The festive-season reading is stated as a *quarter* effect: Diwali fell on 20
+October 2025, inside the enquiry peak, but weekly volume is broadly elevated across October and
+November rather than spiking in any single week — so the page names the festival as context external
+to the dataset and does not claim it as a cause.
+
 **Three things are deliberately not computed, and say so on screen.**
 
 - *Average days to sell*, in the classic inventory sense, is not computable — this dataset has no
@@ -347,7 +356,7 @@ code path, never from an analysis script or a formatted string.*
 
 | Check | Result |
 |---|---|
-| Test suite | 287 passing across 35 files |
+| Test suite | 311 passing across 36 files |
 | Production build | Clean, 12 routes, TypeScript strict, no errors |
 | Route smoke test | 41 URL variants including malformed params, unknown ids and a zero-result range — rendered output parsed for `NaN`/`Infinity`/`undefined`: none |
 | Horizontal overflow | Measured 0px on every route at 1440 / 1024 / 768 — after finding and fixing 199px on `/models` |

@@ -100,3 +100,28 @@ describe("formatDelta", () => {
     expect(result).toBe("— 0 vs previous month");
   });
 });
+
+describe("formatCurrency below one lakh", () => {
+  /**
+   * Regression: this branch was unreachable while the smallest figure in the product was a deal
+   * value (minimum ₹7.5 L). Revenue per lead can fall below ₹1 lakh, which made it live and
+   * exposed that `Intl` renders the fractional part — "₹45,909.091", three decimals of false
+   * precision on a derived average.
+   */
+  it("rounds to whole rupees rather than showing fractional paise", () => {
+    expect(formatCurrency(45909.0909)).toBe("₹45,909");
+    expect(formatCurrency(99999.5)).toBe("₹1,00,000");
+    expect(formatCurrency(0)).toBe("₹0");
+  });
+
+  it("still switches to lakh and crore at the right thresholds", () => {
+    expect(formatCurrency(99_999)).toBe("₹99,999");
+    expect(formatCurrency(100_000)).toBe("₹1.00 L");
+    expect(formatCurrency(9_999_999)).toBe("₹100.00 L");
+    expect(formatCurrency(10_000_000)).toBe("₹1.00 Cr");
+  });
+
+  it("keeps the sign on negative sub-lakh figures", () => {
+    expect(formatCurrency(-45909.4)).toBe("-₹45,909");
+  });
+});

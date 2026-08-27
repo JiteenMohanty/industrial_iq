@@ -5,9 +5,13 @@ import type { AnalyticsContext } from "@/lib/analytics/context";
 import { computeKpis } from "@/lib/analytics/kpis";
 import { computeFunnel, computeStageDurations, computeLossBreakdown } from "@/lib/analytics/funnel";
 import { computeGates, computeBranchGates } from "@/lib/analytics/gates";
-import { computeModelPerformance, computeInterestMatrix } from "@/lib/analytics/models";
+import {
+  computeModelPerformance,
+  computeInterestMatrix,
+  computeSeasonality,
+} from "@/lib/analytics/models";
 import { computeSourcePerformance, computeChannelPerformance } from "@/lib/analytics/sources";
-import { computeRepPerformance } from "@/lib/analytics/reps";
+import { computeRepPerformance, computeRepHeadToHead } from "@/lib/analytics/reps";
 import {
   computeDeliveryOps,
   computeDelayReasons,
@@ -46,6 +50,13 @@ interface ScopeCase {
   branch: boolean;
   time: boolean;
   why?: string;
+  /**
+   * Set false where two different months legitimately produce the same result. The only case is a
+   * function gated on a minimum sample: no rep carries 15+ leads inside a single month, so the
+   * head-to-head correctly returns null for every month. It still *responds* to the time filter
+   * (full range yields a comparison, a month does not) — it just cannot tell two months apart.
+   */
+  monthsDiffer?: boolean;
 }
 
 const CASES: ScopeCase[] = [
@@ -67,6 +78,13 @@ const CASES: ScopeCase[] = [
   { name: "computeDelayReasons", run: computeDelayReasons, branch: true, time: true },
   { name: "computePromiseReliability", run: computePromiseReliability, branch: true, time: true },
   { name: "computeRevenueTrend", run: computeRevenueTrend, branch: true, time: true },
+  {
+    name: "computeRepHeadToHead",
+    run: computeRepHeadToHead,
+    branch: true,
+    time: true,
+    monthsDiffer: false,
+  },
 
   // --- present-tense state: branch only, never time (FR-009) ----------------
   {
@@ -96,6 +114,13 @@ const CASES: ScopeCase[] = [
     branch: true,
     time: false,
     why: "must match the alert scope exactly, or an evidence link shows fewer rows than its alert claimed",
+  },
+  {
+    name: "computeSeasonality",
+    run: computeSeasonality,
+    branch: true,
+    time: false,
+    why: "a seasonality view narrowed to one month would name that month as its own peak",
   },
   {
     name: "computeChannelPerformance",
@@ -168,13 +193,24 @@ describe("filter scope coverage", () => {
       },
     );
 
-    if (c.time) {
+    if (c.time && c.monthsDiffer !== false) {
       it("distinguishes one month from another", () => {
         expect(json(c.run(contextForMonth(MONTH)))).not.toBe(
           json(c.run(contextForMonth(OTHER_MONTH))),
         );
       });
     }
+  });
+});
+
+describe("sample floors degrade honestly under a narrow window", () => {
+  it("the rep head-to-head returns null for a single month rather than comparing tiny books", () => {
+    // ~73 leads spread across 25 officers in a month leaves nobody near the 15-lead floor, so a
+    // "best vs worst" built from that window would be comparing three leads against two. Returning
+    // null and letting the page explain why is the honest outcome; the UI renders an empty state
+    // naming the floor rather than silently dropping the section.
+    expect(computeRepHeadToHead(contextForMonth(MONTH))).toBeNull();
+    expect(computeRepHeadToHead(fullContext())).not.toBeNull();
   });
 });
 

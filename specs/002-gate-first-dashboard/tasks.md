@@ -146,6 +146,36 @@ changed anything on three of them. Investigation confirmed it, and found it was 
 - [X] T298 Verify per route that the rendered output actually changes: branch and time both move
   every page except the two deliberate exceptions. Smoke test extended to 41 URL variants.
 
+## Phase 9 — Demand seasonality and rep head-to-head (post-review)
+
+Requested after the filter fix: a top-selling-model tile, a real comparison in place of the rep
+callouts, and a seasonality reading if the data supported one.
+
+- [X] T300 `computeSeasonality` — enquiries by creation month against units by delivery month, each
+  with its distance from the monthly mean, plus the lag between the two peaks. Branch-scoped, not
+  time-scoped (FR-113a).
+- [X] T301 Verify the seasonality claim before writing any copy. Enquiries peak Nov (95, +30% vs
+  mean); deliveries peak Dec (52, +127%). The one-month lag matches the 38-day median cycle, so the
+  festive-quarter surge is an Oct–Nov event delivered in December.
+- [X] T302 Check the Diwali hypothesis at weekly granularity before asserting it. Diwali 2025 fell
+  on 20 Oct, inside the enquiry peak, but weekly volume is broadly elevated across Oct–Nov rather
+  than spiking in any single week. Copy states a festive-*quarter* reading, labels the festival date
+  as context external to the dataset, and does not claim a single-festival cause.
+- [X] T303 Add the "Top seller by units" tile immediately after "Models in range" — a different
+  model from both the revenue leader and the interest leader, which is the mix finding in one tile.
+- [X] T304 `computeRepHeadToHead` — best vs worst by revenue per lead above the sample floor, with
+  a per-metric gap and the widest gate identified.
+- [X] T305 Replace the three disconnected rep callouts with the head-to-head comparison. They each
+  named a different rep for a different reason and never answered "what separates my best from my
+  worst".
+- [X] T306 Empty state for the head-to-head: inside a single month no officer clears the 15-lead
+  floor, so the section explains the floor rather than vanishing (FR-121a).
+- [X] T307 Fix `formatCurrency` below ₹1 lakh — the branch was unreachable while the smallest figure
+  in the product was a deal value, and rendered "₹45,909.091" once revenue per lead made it live.
+  Regression test added.
+- [X] T308 Tests: 16 for seasonality and head-to-head, 3 for the currency regression, both new
+  functions added to the filter-scope contract. 311 passing across 36 files.
+
 ## Not done
 
 - [ ] T280 Live human 30-second storytelling test. Needs a reader who has not seen the data; the

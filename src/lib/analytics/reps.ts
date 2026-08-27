@@ -1,7 +1,7 @@
 import type { AnalyticsContext } from "./context";
 import type { LeadStatus, RepRole, Source, Stage } from "@/lib/data/types";
 import { sumDealValue } from "../insights/helpers";
-import { rate } from "./benchmark";
+import { rate, BENCHMARK } from "./benchmark";
 
 export interface RepPerformance {
   repId: string;
@@ -168,5 +168,180 @@ export function computeRepDetail(ctx: AnalyticsContext, repId: string): RepDetai
     revenueRupees: revenue,
     revenuePerLeadRupees: leads.length === 0 ? null : revenue / leads.length,
     assignedLeads,
+  };
+}
+
+// ------------------------------------------------------------------------------------------
+// Top vs bottom performer
+// ------------------------------------------------------------------------------------------
+
+export interface HeadToHeadMetric {
+  key: string;
+  label: string;
+  hint?: string;
+  topValue: number | null;
+  bottomValue: number | null;
+  unit: "count" | "pct" | "rupees";
+  /** Gap in the metric's own unit — percentage points for rates, a multiple for money. */
+  gapText: string;
+  /** 0-1 bar fill, for rate metrics only. Null suppresses the bar. */
+  topBar: number | null;
+  bottomBar: number | null;
+}
+
+export interface RepHeadToHead {
+  top: RepPerformance;
+  bottom: RepPerformance;
+  topRank: number;
+  bottomRank: number;
+  poolSize: number;
+  minSample: number;
+  metrics: HeadToHeadMetric[];
+  /** The gate where the largest gap in percentage points opens. */
+  widestGate: { key: "contact" | "test_drive" | "close"; label: string; gapPoints: number } | null;
+}
+
+const closeRatePct = (r: RepPerformance): number | null =>
+  r.testDrivenCount === 0 ? null : (r.deliveredCount / r.testDrivenCount) * 100;
+
+/**
+ * Head-to-head between the best and worst sales officer.
+ *
+ * Replaces three disconnected callouts that each named a different rep for a different reason —
+ * informative individually, but they never answered the question a sales manager actually asks:
+ * *what separates my best rep from my worst?* One comparison across the same metric set answers it,
+ * and because both reps are ranked on the same basis the reader can check the judgement rather than
+ * taking it on trust.
+ *
+ * Ranked on revenue per lead, not total revenue: total revenue rewards whoever was handed the
+ * biggest book. A minimum sample (the shared benchmark floor) keeps a rep with a handful of lucky
+ * leads out of either end — on this dataset that floor is what stops a 14-lead rep taking first
+ * place from a 25-lead rep doing the same job at scale.
+ *
+ * Returns null when fewer than two reps clear the floor, rather than inventing a comparison.
+ */
+export function computeRepHeadToHead(ctx: AnalyticsContext): RepHeadToHead | null {
+  const eligible = computeRepPerformance(ctx).filter(
+    (r) => r.role === "sales_officer" && r.leadCount >= BENCHMARK.minSample,
+  );
+  if (eligible.length < 2) return null;
+
+  const ranked = [...eligible].sort((a, b) => {
+    const av = a.revenuePerLeadRupees ?? -1;
+    const bv = b.revenuePerLeadRupees ?? -1;
+    if (av !== bv) return bv - av;
+    return a.repId.localeCompare(b.repId); // total order, so the pair never swaps between renders
+  });
+
+  const top = ranked[0] as RepPerformance;
+  const bottom = ranked[ranked.length - 1] as RepPerformance;
+
+  const ratio = (a: number | null, b: number | null): string => {
+    if (a === null || b === null || b <= 0) return "—";
+    const x = a / b;
+    return x >= 10 ? `${Math.round(x)}×` : `${x.toFixed(1)}×`;
+  };
+  const points = (a: number | null, b: number | null): string => {
+    if (a === null || b === null) return "—";
+    const gap = a - b;
+    return `${gap >= 0 ? "+" : "−"}${Math.abs(gap).toFixed(1)}pp`;
+  };
+
+  const metrics: HeadToHeadMetric[] = [
+    {
+      key: "leads",
+      label: "Leads assigned",
+      hint: "the size of the book",
+      topValue: top.leadCount,
+      bottomValue: bottom.leadCount,
+      unit: "count",
+      gapText: ratio(top.leadCount, bottom.leadCount),
+      topBar: null,
+      bottomBar: null,
+    },
+    {
+      key: "contact",
+      label: "Contact rate",
+      hint: "of leads assigned",
+      topValue: top.contactRatePct,
+      bottomValue: bottom.contactRatePct,
+      unit: "pct",
+      gapText: points(top.contactRatePct, bottom.contactRatePct),
+      topBar: (top.contactRatePct ?? 0) / 100,
+      bottomBar: (bottom.contactRatePct ?? 0) / 100,
+    },
+    {
+      key: "test_drive",
+      label: "Test-drive rate",
+      hint: "of contacted leads",
+      topValue: top.testDriveRatePct,
+      bottomValue: bottom.testDriveRatePct,
+      unit: "pct",
+      gapText: points(top.testDriveRatePct, bottom.testDriveRatePct),
+      topBar: (top.testDriveRatePct ?? 0) / 100,
+      bottomBar: (bottom.testDriveRatePct ?? 0) / 100,
+    },
+    {
+      key: "close",
+      label: "Close rate",
+      hint: "of test-driven leads",
+      topValue: closeRatePct(top),
+      bottomValue: closeRatePct(bottom),
+      unit: "pct",
+      gapText: points(closeRatePct(top), closeRatePct(bottom)),
+      topBar: (closeRatePct(top) ?? 0) / 100,
+      bottomBar: (closeRatePct(bottom) ?? 0) / 100,
+    },
+    {
+      key: "delivered",
+      label: "Units delivered",
+      topValue: top.deliveredCount,
+      bottomValue: bottom.deliveredCount,
+      unit: "count",
+      gapText: ratio(top.deliveredCount, bottom.deliveredCount),
+      topBar: null,
+      bottomBar: null,
+    },
+    {
+      key: "revenue",
+      label: "Revenue",
+      topValue: top.revenueRupees,
+      bottomValue: bottom.revenueRupees,
+      unit: "rupees",
+      gapText: ratio(top.revenueRupees, bottom.revenueRupees),
+      topBar: null,
+      bottomBar: null,
+    },
+    {
+      key: "revenue_per_lead",
+      label: "Revenue per lead",
+      hint: "the ranking metric",
+      topValue: top.revenuePerLeadRupees,
+      bottomValue: bottom.revenuePerLeadRupees,
+      unit: "rupees",
+      gapText: ratio(top.revenuePerLeadRupees, bottom.revenuePerLeadRupees),
+      topBar: null,
+      bottomBar: null,
+    },
+  ];
+
+  const gateGaps = ([
+    { key: "contact", label: "contact", a: top.contactRatePct, b: bottom.contactRatePct },
+    { key: "test_drive", label: "test-drive", a: top.testDriveRatePct, b: bottom.testDriveRatePct },
+    { key: "close", label: "close", a: closeRatePct(top), b: closeRatePct(bottom) },
+  ] as const)
+    .filter((g) => g.a !== null && g.b !== null)
+    .map((g) => ({ key: g.key, label: g.label, gapPoints: (g.a as number) - (g.b as number) }))
+    .sort((x, y) => y.gapPoints - x.gapPoints);
+
+  return {
+    top,
+    bottom,
+    topRank: 1,
+    bottomRank: ranked.length,
+    poolSize: ranked.length,
+    minSample: BENCHMARK.minSample,
+    metrics,
+    widestGate: gateGaps[0] ?? null,
   };
 }

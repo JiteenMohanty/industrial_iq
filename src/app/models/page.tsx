@@ -4,6 +4,7 @@ import {
   computeModelPerformance,
   computeInterestMatrix,
   computeAspTrend,
+  computeSeasonality,
   heatmapHighlights,
   type HeatmapDimension,
   type HeatmapMetric,
@@ -51,6 +52,9 @@ export default async function ModelsPage({
   const totalLeads = models.reduce((s, m) => s + m.leads, 0);
   const topByRevenue = models[0];
   const topByVolume = [...models].sort((a, b) => b.leads - a.leads)[0];
+  const topByUnits = [...models].sort((a, b) => b.delivered - a.delivered)[0];
+  const totalUnits = models.reduce((s, m) => s + m.delivered, 0);
+  const season = computeSeasonality(ctx);
   const topTwoShare = models.slice(0, 2).reduce((s, m) => s + (m.revenueSharePct ?? 0), 0);
 
   const firstAsp = asp.find((a) => a.aspRupees !== null);
@@ -118,11 +122,23 @@ export default async function ModelsPage({
       />
 
       <section aria-label="Demand headlines">
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-5">
           <StatTile
             label="Models in range"
             value={formatCount(models.length)}
             hint={`${formatCount(totalLeads)} leads across all of them`}
+          />
+          <StatTile
+            label="Top seller by units"
+            value={topByUnits?.model ?? "—"}
+            hint={
+              topByUnits
+                ? `${formatCount(topByUnits.delivered)} of ${formatCount(totalUnits)} units · ${formatPercent(
+                    totalUnits > 0 ? (topByUnits.delivered / totalUnits) * 100 : 0,
+                    0,
+                  )} of everything delivered`
+                : undefined
+            }
           />
           <StatTile
             label="Top model by revenue"
@@ -174,6 +190,157 @@ export default async function ModelsPage({
             <Figure>mix</Figure> indicator, not as discounting or negotiating skill, and it is not
             used anywhere in this product to judge a rep or a branch.
           </Callout>
+        </section>
+      )}
+
+      {/* ---------------------------------------------------------------------- Seasonality */}
+      {season.peakDemand && season.peakSales && (
+        <section aria-label="Seasonality">
+          <Card>
+            <SectionHeading
+              title="When demand arrives, and when it becomes revenue"
+              hint="Enquiries counted on the month they arrived; units on the month the customer took delivery. Follows the branch filter but not the time range — a seasonality view narrowed to one month would report that month as its own peak."
+            />
+
+            <div className="scroll-x">
+              <table className="w-full border-collapse text-sm" style={{ minWidth: 620 }}>
+                <caption className="sr-only">
+                  Enquiries and units delivered by month, against the monthly mean
+                </caption>
+                <thead>
+                  <tr className="border-b border-border">
+                    <th scope="col" className="px-3 py-2 text-left">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">
+                        Month
+                      </span>
+                    </th>
+                    <th scope="col" className="px-3 py-2 text-left">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">
+                        Enquiries
+                      </span>
+                      <span className="block text-[10px] font-normal normal-case text-ink-muted">
+                        when interest arrived
+                      </span>
+                    </th>
+                    <th scope="col" className="px-3 py-2 text-left">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">
+                        Units delivered
+                      </span>
+                      <span className="block text-[10px] font-normal normal-case text-ink-muted">
+                        when the car was handed over
+                      </span>
+                    </th>
+                    <th scope="col" className="px-3 py-2 text-right">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">
+                        Revenue
+                      </span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {season.points.map((p) => {
+                    const maxLeads = Math.max(...season.points.map((x) => x.leadsCreated), 1);
+                    const maxUnits = Math.max(...season.points.map((x) => x.unitsDelivered), 1);
+                    const isPeakDemand = p.month === season.peakDemand?.month;
+                    const isPeakSales = p.month === season.peakSales?.month;
+                    return (
+                      <tr key={p.month} className="border-b border-grid last:border-0">
+                        <td className="px-3 py-2 text-ink-primary">{p.label}</td>
+                        <td className="px-3 py-2">
+                          <span className="flex items-center gap-2">
+                            <span className="w-8 shrink-0 tabular-nums text-ink-primary">
+                              {formatCount(p.leadsCreated)}
+                            </span>
+                            <span
+                              aria-hidden="true"
+                              className="h-2 flex-1 overflow-hidden rounded-full bg-raised"
+                            >
+                              <span
+                                className={`block h-full rounded-full ${isPeakDemand ? "bg-series-2" : "bg-baseline"}`}
+                                style={{ width: `${(p.leadsCreated / maxLeads) * 100}%` }}
+                              />
+                            </span>
+                            {isPeakDemand && (
+                              <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-ink-secondary">
+                                peak
+                              </span>
+                            )}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className="flex items-center gap-2">
+                            <span className="w-8 shrink-0 tabular-nums text-ink-primary">
+                              {formatCount(p.unitsDelivered)}
+                            </span>
+                            <span
+                              aria-hidden="true"
+                              className="h-2 flex-1 overflow-hidden rounded-full bg-raised"
+                            >
+                              <span
+                                className={`block h-full rounded-full ${isPeakSales ? "bg-accent" : "bg-baseline"}`}
+                                style={{ width: `${(p.unitsDelivered / maxUnits) * 100}%` }}
+                              />
+                            </span>
+                            {isPeakSales && (
+                              <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-ink-secondary">
+                                peak
+                              </span>
+                            )}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums text-ink-secondary">
+                          {formatCurrency(p.revenueRupees)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-4 grid gap-3 border-t border-grid pt-4 lg:grid-cols-2">
+              <Callout tone="accent" label="The peak selling month">
+                <Figure>{season.peakSales.label}</Figure> is comfortably the biggest month —{" "}
+                <Figure>{formatCount(season.peakSales.unitsDelivered)}</Figure> cars worth{" "}
+                <Figure>{formatCurrency(season.peakSales.revenueRupees)}</Figure>, about{" "}
+                <Figure>
+                  {formatPercent(season.peakSales.salesVsMeanPct ?? 0, 0)}
+                </Figure>{" "}
+                above the monthly average of{" "}
+                <Figure>{formatCount(Math.round(season.meanUnitsPerMonth ?? 0))}</Figure> units.
+              </Callout>
+
+              <Callout tone="neutral" label="But demand arrived earlier">
+                Enquiries peaked in <Figure>{season.peakDemand.label}</Figure> at{" "}
+                <Figure>{formatCount(season.peakDemand.leadsCreated)}</Figure> leads,{" "}
+                <Figure>{formatPercent(season.peakDemand.demandVsMeanPct ?? 0, 0)}</Figure> above
+                average
+                {season.lagMonths !== null && season.lagMonths > 0 && season.medianCycleDays !== null && (
+                  <>
+                    {" "}
+                    — <Figure>{season.lagMonths}</Figure>{" "}
+                    {season.lagMonths === 1 ? "month" : "months"} before the delivery peak, which is
+                    what a median sales cycle of{" "}
+                    <Figure>{formatDays(season.medianCycleDays)}</Figure> would predict. The
+                    festive-quarter surge is not a December event; it is an October–November event
+                    being handed over in December
+                  </>
+                )}
+                .
+              </Callout>
+            </div>
+
+            <p className="mt-3 text-[11px] leading-relaxed text-ink-muted">
+              Read as an operations signal rather than a marketing one: stock and delivery capacity
+              need to be in place for the delivery peak, but the enquiry surge that creates it lands
+              roughly {season.medianCycleDays === null ? "a month" : formatDays(season.medianCycleDays)}{" "}
+              earlier, and that is when contact and test-drive capacity decide how much of it
+              converts. Context this dataset does not itself contain: Diwali fell on 20 October 2025,
+              inside the enquiry peak — but the elevation runs broadly across October and November
+              rather than spiking in any single week, so the data supports a festive-quarter reading
+              and not a single-festival one.
+            </p>
+          </Card>
         </section>
       )}
 
