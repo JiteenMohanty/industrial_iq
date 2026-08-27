@@ -192,6 +192,29 @@ callouts, and a seasonality reading if the data supported one.
   so runtime checks are unreliable in it): `scroll:false` reaches `next/link` for exactly the
   intended links and no others, across all eight routes.
 
+## Phase 11 — The real cause of the scroll reset (post-review)
+
+Phase 10's `ViewLink` was necessary but not sufficient: the user reported the same behaviour on
+Demand after it shipped. Measurement found a second, larger cause.
+
+- [X] T320 Measure rather than reason. On `/models` the real content renders 2083px tall against a
+  808px `PageSkeleton` — max scroll 1363px against 88px. A same-route parameter change swaps in
+  `loading.tsx`, the document collapses to a third of its height, and the browser clamps scroll to
+  the new maximum. `scroll={false}` cannot prevent this: it governs Next.js's scroll-to-top, not the
+  browser's clamping of a shrinking document.
+- [X] T321 Remove all eight `loading.tsx` files. Without a fallback Next keeps the current page
+  rendered until the new payload arrives; at 16-160ms that is imperceptible and strictly better than
+  a skeleton flash.
+- [X] T322 Trim `Skeleton.tsx` to the primitive. The only remaining Suspense fallback is the filter
+  bar's, which is height-matched to the real control row and cannot collapse the page.
+- [X] T323 Guard test: no route may define `loading.tsx`, with the measured reason recorded at the
+  assertion.
+- [X] T324 Verify end to end in a real browser, now that page content hydrates: `/models` scrolled
+  to 900 -> switch heatmap metric -> **903**, client-side, URL updated. `/leads` (21,156px tall)
+  scrolled to 600 -> sort by Age -> **603**. Nav link from 500 -> **0**, as intended.
+- [X] T325 Restate FR-035 rather than silently dropping it — the requirement changed meaning and the
+  spec should say why.
+
 ## Not done
 
 - [ ] T280 Live human 30-second storytelling test. Needs a reader who has not seen the data; the

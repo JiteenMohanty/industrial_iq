@@ -129,6 +129,14 @@ unfalsifiable. So every judgement is "ahead of / behind *this group*", and the g
 printed beside it. Entities below 15 leads get no mark at all rather than a caveated one — a rep
 with nine leads is not "underperforming", they are unmeasured.
 
+**No page-level loading skeletons — a measured decision, not an omission.** The obvious way to show
+a route is working is a skeleton. Measured here, that skeleton stands 808px tall against 2083px of
+real content, so swapping it in on a parameter change collapses the document and the *browser*
+clamps the reader's scroll position: 1363px of available scroll becomes 88px. At a 16-160 ms server
+response the fallback bought nothing and cost the reader their place on every interaction, so it is
+gone and Next simply keeps the current page rendered until the new payload arrives. The one
+remaining fallback is the filter bar's, which is height-matched to the control row it replaces.
+
 **The URL is the only view state — which had one cost, now paid.** Every control writes to the URL,
 which is what makes each view shareable by address. But it means Next.js cannot tell "go to the
 branch page" from "switch this chart to units": both are link navigations, and its default is to
@@ -365,7 +373,7 @@ code path, never from an analysis script or a formatted string.*
 
 | Check | Result |
 |---|---|
-| Test suite | 330 passing across 37 files |
+| Test suite | 332 passing across 37 files |
 | Production build | Clean, 12 routes, TypeScript strict, no errors |
 | Route smoke test | 41 URL variants including malformed params, unknown ids and a zero-result range — rendered output parsed for `NaN`/`Infinity`/`undefined`: none |
 | Horizontal overflow | Measured 0px on every route at 1440 / 1024 / 768 — after finding and fixing 199px on `/models` |

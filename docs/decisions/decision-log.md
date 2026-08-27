@@ -1688,3 +1688,48 @@ links all genuinely navigate. Final confirmation of the felt behaviour needs a r
 Server response for a control change measures 16–160 ms, so the `loading.tsx` skeleton that a
 same-route parameter change re-triggers flashes briefly rather than reading as a reload. The
 skeletons are kept (FR-035).
+
+## 2026-08-27 · Phase 11 · T320 — The scroll reset had a second, larger cause
+
+**Decision**: Remove every `loading.tsx`. The page-level skeleton, not link behaviour, was doing
+most of the damage.
+
+**Reasoning**: The user reported the same scroll reset on the Demand tab after Phase 10 shipped.
+`ViewLink` was verifiably in place and `scroll:false` was reaching `next/link`, so something else
+was moving the page. Measured it rather than theorising:
+
+| | height | max scroll |
+|---|---:|---:|
+| `/models` real content | 2083px | 1363px |
+| `PageSkeleton` fallback | 808px | 88px |
+
+On a same-route parameter change Next swaps in the `loading.tsx` fallback. The document collapses to
+roughly a third of its height, and the **browser** clamps `scrollY` to the new maximum — a reader at
+1200px lands at 88px. The real content then streams back and the position is already gone.
+
+`scroll={false}` cannot help with this. It suppresses Next.js's own scroll-to-top; it has no say in
+the browser's clamping when the document shrinks underneath it. Phase 10 was necessary — without it
+the reset happens even with a height-stable page — but it was not sufficient, and I should have
+measured before declaring it fixed.
+
+Removing the fallback means Next keeps the current page rendered until the new payload arrives.
+Server responses measure 16-160ms, so the change reads as the content simply updating. The skeleton
+was buying nothing at that latency and costing the reader their place on every interaction.
+
+**Verified end to end**, in a real browser this time — removing the page Suspense boundary also let
+the browser pane hydrate page content, which it previously could not:
+
+- `/models`, scrolled to 900, switch heatmap metric to Conversion -> scrollY **903**, client-side
+  navigation confirmed by a surviving window marker, URL updated.
+- `/leads` (21,156px tall), scrolled to 600, sort by Age -> scrollY **603**.
+- Nav link from scrollY 500 -> **0**. Genuine navigation still scrolls to top, as intended.
+
+**Consequence for FR-035**: the requirement said every view must render a loading state. It now says
+the opposite, for a measured reason, and the spec records the measurement rather than quietly
+dropping the line. The only Suspense fallback left is the filter bar's, which is height-matched to
+the real control row and so cannot move the page.
+
+**A note on method**: I twice reported this area fixed on weaker evidence than the fix deserved —
+first from source inspection, then from the RSC payload. Both were true and neither was sufficient,
+because the failure was a layout consequence that only a rendered measurement could reveal. The
+same lesson the v1 audit produced about "verified by structural code review", arriving again.

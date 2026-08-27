@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readFileSync, readdirSync } from "node:fs";
+import { resolve, join } from "node:path";
 
 /**
  * Guards the in-place-navigation convention.
@@ -85,6 +85,46 @@ describe("pages whose table rows open a sheet in place opt in", () => {
     ["app/reps/[repId]/page.tsx", "assigned leads"],
   ])("%s", (path) => {
     expect(src(path)).toContain("rowPreservesScroll");
+  });
+});
+
+describe("no page-level loading fallback", () => {
+  /**
+   * Measured, not assumed: on /models the real content renders 2083px tall against a 808px
+   * PageSkeleton. A same-route parameter change — switching the heatmap metric, sorting a table —
+   * swaps in that fallback, the document collapses to a third of its height, and the **browser**
+   * clamps the reader's scroll position to the new maximum (1363px of scroll becomes 88px). The
+   * real content then returns and the position is already gone.
+   *
+   * `scroll={false}` cannot prevent this. It stops Next.js scrolling to the top; it has no say in
+   * the browser's own clamping when a document shrinks underneath it.
+   *
+   * Server responses measure 16-160 ms, so without a fallback Next simply keeps the current page
+   * rendered until the new payload arrives — no collapse, no clamp, no flash. The fallback was
+   * buying nothing and costing the reader their place on every single interaction.
+   *
+   * If a loading state is ever wanted again it has to preserve document height, which in practice
+   * means an overlay or an inline indicator rather than a replacement skeleton.
+   */
+  it("no route defines loading.tsx", () => {
+    const appDir = resolve(process.cwd(), "src/app");
+    const found: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (entry.name === "loading.tsx") found.push(full.replace(appDir, ""));
+      }
+    };
+    walk(appDir);
+    expect(found, "a page-level skeleton collapses document height and resets scroll").toEqual([]);
+  });
+
+  it("the filter bar fallback is the only Suspense fallback, and is height-stable", () => {
+    const layout = src("app/layout.tsx");
+    expect(layout).toContain("<Suspense");
+    // Fixed small heights matching the real control row, so the swap does not move the page.
+    expect(src("components/ui/Skeleton.tsx")).not.toContain("PageSkeleton");
   });
 });
 

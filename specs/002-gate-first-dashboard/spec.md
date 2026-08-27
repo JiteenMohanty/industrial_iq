@@ -211,6 +211,21 @@ sends bad leads" from "we never worked this channel's leads".
   judges. Comparing a branch's November contact rate against an all-time group figure compares two
   different populations.
 
+**Loading and in-place navigation (revised post-review)**
+
+- **FR-035** *(revised)*: Views MUST NOT render a page-level loading skeleton that replaces their
+  content. Measured on this build, a full-page skeleton stands 808px tall against 2083px of real
+  content; swapping it in on a same-route parameter change collapses the document and makes the
+  **browser** clamp the reader's scroll position — 1363px of available scroll becomes 88px. Since
+  server responses measure 16-160ms, the fallback bought nothing and cost the reader their place on
+  every interaction. Any future loading affordance MUST preserve document height (an overlay or an
+  inline indicator), never replace the content.
+- **FR-035a**: Controls that change the current view MUST preserve scroll position. Links that
+  navigate elsewhere MUST NOT — scrolling to the top is correct there.
+- **FR-035b**: Internal navigation MUST use client-side routing. A raw anchor to an internal route
+  forces a full document reload and discards view state. The only permitted raw anchors are
+  same-document fragments and file downloads the router must not intercept.
+
 **Seasonality and head-to-head (added post-review)**
 
 - **FR-113**: The demand view MUST report the peak *selling* month and the peak *enquiry* month
