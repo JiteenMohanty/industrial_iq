@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { resolvePage, type SearchParams } from "@/lib/filters/page-context";
 import { buildHref } from "@/lib/filters/parse";
 import { computeFunnel } from "@/lib/analytics/funnel";
-import { computeGates, computeGatesFor } from "@/lib/analytics/gates";
+import { computeGatesFor } from "@/lib/analytics/gates";
 import { computeRepPerformance } from "@/lib/analytics/reps";
 import { computePromiseReliabilityByBranch } from "@/lib/analytics/deliveries";
 import { runInsights } from "@/lib/insights/engine";
@@ -34,16 +34,22 @@ export default async function BranchDetailPage({
 
   const leads = ctx.dataset.leadsByBranch.get(branchId) ?? [];
   const gates = computeGatesFor(leads);
-  const groupGates = computeGates(ctx);
+  // Baselines are every branch in the selected window. computeGates(ctx) would follow the shared
+  // branch filter, so a reader with a *different* branch selected would see this page compare
+  // itself against that one rather than against the group.
+  const groupGates = computeGatesFor(ctx.windowLeads);
   const branchFunnel = computeFunnel(ctx, { branchId });
-  const groupFunnel = computeFunnel(ctx);
+  // `pool: "window"` keeps the baseline at every branch for the selected period. Without it, a
+  // reader arriving with the shared branch filter already set would see this branch compared
+  // against itself.
+  const groupFunnel = computeFunnel(ctx, { pool: "window" });
 
   const delivered = leads.filter((l) => l.reachedStages.has("delivered"));
   const revenue = delivered.reduce((s, l) => s + l.dealValue, 0);
   const conversionPct = rate(delivered.length, leads.length);
   const groupConversion = rate(
-    ctx.groupLeads.filter((l) => l.reachedStages.has("delivered")).length,
-    ctx.groupLeads.length,
+    ctx.windowLeads.filter((l) => l.reachedStages.has("delivered")).length,
+    ctx.windowLeads.length,
   );
   const targetUnits = ctx.dataset.months.reduce(
     (s, m) => s + (ctx.dataset.targetsByBranchMonth.get(`${branchId}:${m}`)?.target_units ?? 0),
@@ -132,7 +138,7 @@ export default async function BranchDetailPage({
         <SectionHeading
           as="h1"
           title={branch.name}
-          hint={`${branch.city} · ${formatCount(leads.length)} leads across the full history. Headline tiles below use the full history so this page compares cleanly against the group.`}
+          hint={`${branch.city} · ${formatCount(leads.length)} leads across the full history. This page scopes itself from its own URL, so the shared branch filter does not apply here; comparisons are against every branch in the selected time range.`}
         />
       </div>
 

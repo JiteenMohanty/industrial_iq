@@ -45,9 +45,11 @@ export default async function OverviewPage({
     "revenue") as TrendMetric;
 
   // --- storytelling inputs, all derived on this render -----------------------------------
+  // The baseline every status mark is judged against: all branches, same time window, so a
+  // narrowed range compares like with like.
   const groupConversion = rate(
-    ctx.groupLeads.filter((l) => l.reachedStages.has("delivered")).length,
-    ctx.groupLeads.length,
+    ctx.windowLeads.filter((l) => l.reachedStages.has("delivered")).length,
+    ctx.windowLeads.length,
   );
   const ranked = rankBy(branchGates, (b) => b.conversionPct, (b) => b.branchId);
   const best = ranked[0]?.row;
@@ -61,7 +63,7 @@ export default async function OverviewPage({
   const branchRevenue = new Map(
     ctx.dataset.branches.map((b) => [
       b.id,
-      ctx.groupDeliveries
+      ctx.windowDeliveries
         .filter((d) => d.lead.branchId === b.id)
         .reduce((s, d) => s + d.lead.dealValue, 0),
     ]),
@@ -224,7 +226,7 @@ export default async function OverviewPage({
         <Card className="lg:col-span-3">
           <SectionHeading
             title="Where the business is lost"
-            hint="Every lead ever received, and the gate it died at. Whole dataset — not scoped by the time filter."
+            hint="Every lead this branch selection has ever received, and the gate it died at. Follows the branch filter; deliberately not the time filter, so a narrow window cannot make the leak look smaller than it is."
           />
           <GateFunnel
             gates={gates}
@@ -335,7 +337,7 @@ export default async function OverviewPage({
       <section aria-label="Branch comparison">
         <SectionHeading
           title="Branch scorecard"
-          hint="Full history for every branch, so the comparison is like-for-like. Status marks are relative to the group's own figure, never an external benchmark."
+          hint="Every branch, on the selected time range, so the comparison is like-for-like. Status marks compare each branch to the group's own figure for that same range, never an external benchmark."
           action={
             <Link
               href={buildHref("/branches", filters)}

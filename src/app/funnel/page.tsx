@@ -21,12 +21,17 @@ export default async function FunnelPage({
 }) {
   const { filters, ctx, param } = await resolvePage(searchParams);
 
-  // Deliberately separate from the shared branch filter: narrowing the branch filter would also
-  // narrow the group baseline this overlay compares against, which defeats the comparison.
-  const overlayId = param("overlay");
+  // The baseline line is ALWAYS every branch in the selected window — comparing a branch against
+  // a baseline that has already been narrowed to that same branch would draw two identical shapes
+  // and call it a comparison.
+  //
+  // The branch in focus comes from the shared branch filter when one is set, and otherwise from
+  // this page's own `?overlay=` control. Before this, `?overlay=` was the only way in and the
+  // shared filter did nothing here at all.
+  const overlayId = param("overlay") ?? filters.branchId;
   const overlayBranch = overlayId ? ctx.dataset.branchById.get(overlayId) : undefined;
 
-  const group = computeFunnel(ctx);
+  const group = computeFunnel(ctx, { pool: "window" });
   const overlay = overlayBranch ? computeFunnel(ctx, { branchId: overlayBranch.id }) : undefined;
   const durations = computeStageDurations(ctx);
   const loss = computeLossBreakdown(ctx);
@@ -55,7 +60,7 @@ export default async function FunnelPage({
         <SectionHeading
           title="The two gates"
           as="h1"
-          hint="Full history, every branch. Contact and test drive decide the outcome before any negotiating skill applies."
+          hint="Follows the branch filter; deliberately not the time filter, so a narrow window cannot make the leak look smaller than it is. Contact and test drive decide the outcome before any negotiating skill applies."
         />
         <div className="grid gap-4 lg:grid-cols-5">
           <Card className="lg:col-span-3">
@@ -72,7 +77,8 @@ export default async function FunnelPage({
           </Card>
           <div className="space-y-4 lg:col-span-2">
             <Callout tone="critical" label="Why this framing">
-              Across all {formatCount(ctx.groupLeads.length)} leads, not one skipped a stage, and{" "}
+              Across all {formatCount(ctx.dataset.leads.length)} leads in the dataset, not one
+              skipped a stage, and{" "}
               <Figure>
                 {gates.noTestDriveDelivered} of {formatCount(gates.noTestDriveCount)}
               </Figure>{" "}

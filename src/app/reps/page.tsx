@@ -149,7 +149,7 @@ export default async function RepsPage({
       <SectionHeading
         title="Sales rep benchmark"
         as="h1"
-        hint={`${formatCount(officers.length)} sales officers, full history. ${
+        hint={`${formatCount(officers.length)} sales officers in the current selection. ${
           managersWithoutLeads.length > 0
             ? `${managersWithoutLeads.length} branch managers are excluded — none holds any assigned leads in this dataset.`
             : ""

@@ -4,8 +4,7 @@ import { Suspense } from "react";
 import { getDataset } from "@/lib/data/dataset";
 import { getRealNow, monthsBetween } from "@/lib/time";
 import { formatDate } from "@/lib/format";
-import { TimeRangeFilter } from "@/components/filters/TimeRangeFilter";
-import { BranchFilter } from "@/components/filters/BranchFilter";
+import { FilterBar as FilterControls } from "@/components/filters/FilterBar";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
@@ -146,17 +145,12 @@ function FilterBarSkeleton() {
  */
 function FilterBar() {
   const dataset = getDataset();
-  const minDate = dataset.minCreatedAt.toISOString().slice(0, 10);
-  const maxDate = dataset.dataAsOf.toISOString().slice(0, 10);
-  const branches = dataset.branches.map((b) => ({ id: b.id, label: b.label }));
-
   return (
-    <div className="border-t border-grid bg-page px-4 py-2">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4">
-        <TimeRangeFilter minDate={minDate} maxDate={maxDate} />
-        <BranchFilter branches={branches} />
-      </div>
-    </div>
+    <FilterControls
+      minDate={dataset.minCreatedAt.toISOString().slice(0, 10)}
+      maxDate={dataset.dataAsOf.toISOString().slice(0, 10)}
+      branches={dataset.branches.map((b) => ({ id: b.id, label: b.label }))}
+    />
   );
 }
 

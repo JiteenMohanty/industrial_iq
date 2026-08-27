@@ -112,7 +112,7 @@ export default async function SourcesPage({
       <SectionHeading
         title="Lead sources"
         as="h1"
-        hint="Where leads come from, and what each channel is actually worth per lead supplied. Full history, so channels compare on the same basis."
+        hint="Where leads come from, and what each channel is actually worth per lead supplied. Scoped by both filters, so channels compare on the same basis within whatever selection is active."
       />
 
       <section aria-label="Source headlines">

@@ -207,6 +207,22 @@ sends bad leads" from "we never worked this channel's leads".
 - **FR-143**: Every comparative judgement (a status mark, a rank) MUST be made against the group's
   own figure and MUST display that figure beside it. Entities below a minimum sample MUST receive no
   judgement at all rather than a caveated one.
+- **FR-143a**: A comparison baseline MUST be drawn from the same time range as the figures it
+  judges. Comparing a branch's November contact rate against an all-time group figure compares two
+  different populations.
+
+**Filter scope contract**
+
+- **FR-144**: Every analytics function MUST have a deliberate, documented answer to whether it
+  responds to the branch filter and to the time filter. The three classes are: population views
+  (both apply), present-tense state — alerts, gates, stuck orders, the lead explorer — (branch
+  only, per FR-009), and cross-branch comparison tables (time only, because narrowing them to one
+  row removes their purpose).
+- **FR-144a**: The shared filter bar MUST NOT display a control that has no effect on the current
+  view. Where a view deliberately ignores a filter, it MUST say so beside the controls rather than
+  leaving the reader to infer it from a screen that did not change.
+- **FR-144b**: The scope of every function MUST be asserted by test in both directions — that it
+  responds where it should, and that it does not where it must not.
 
 ### Retained from v1 (unchanged)
 

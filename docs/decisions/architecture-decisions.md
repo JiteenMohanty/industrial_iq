@@ -456,3 +456,37 @@ generalises the rule.
 **Consequences**: A palette edit that breaks the floor fails the suite rather than shipping. The
 sequential ramp's ink flip and the exclusion of `#2a78d6` from the dark ramp are both pinned by
 test. Contrast is no longer something a reviewer has to remember to check.
+
+## ADR-0015: Every view declares its filter scope, and the filter bar shows only what applies
+
+**Status**: Accepted
+
+**Context**: The shared Time range / Branch bar rendered on every route, but almost every analytics
+function read the unfiltered `groupLeads` pool. The controls were therefore inert on `/funnel`,
+`/models`, `/sources`, `/reps` and most of `/deliveries`; the time range reached only the Overview's
+KPI tiles. This was not a deliberate design that had been under-communicated — it was an accident of
+each function reaching for the most convenient pool, with a "structural comparison" rationale
+attached after the fact that only genuinely applied to the cross-branch tables.
+
+**Decision**: Three scope classes, applied deliberately per function and asserted by test.
+
+| Scope | Pool | Applies to |
+|---|---|---|
+| Branch + time | `ctx.leads` / `ctx.deliveries` | Population views: KPIs, funnel, stage durations, loss breakdown, models, sources, reps, delivery ops, promise reliability, revenue trend |
+| Branch only | `ctx.detectionLeads` | Present-tense state: alerts, gates, stuck orders, lead explorer, channel-quality rule input |
+| Time only | `ctx.windowLeads` / `ctx.windowDeliveries` | Cross-branch comparison tables, and every comparison baseline |
+
+`windowLeads` is new and exists because a baseline must come from the same period as the figures it
+judges — comparing a branch's November contact rate against an all-time group figure compares two
+different populations.
+
+The filter bar is route-aware: the branch control is hidden on the two single-entity detail pages
+(which scope from their own URL path) and on `/branches` (which exists to rank every branch), and a
+short line states the scope wherever a filter is deliberately ignored.
+
+**Consequences**: Both controls now change output on every page except the two intentional
+exceptions, verified per route against rendered HTML. `tests/filters/scope-coverage.spec.ts` pins
+all 20 functions in both directions, so a future change that silently drops or adds responsiveness
+fails the suite. `computeChannelPerformance` needed its own detection-scoped pass rather than
+projecting `computeSourcePerformance`, which now follows the time window — without that split the
+channel-quality rule would have quietly stopped firing under a narrow window, violating FR-009.

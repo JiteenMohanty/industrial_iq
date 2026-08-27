@@ -17,3 +17,23 @@ export function contextForBranch(branchId: string): AnalyticsContext {
   );
   return buildContext(filters);
 }
+
+/** A specific month — used to prove the time filter actually reaches an analytics function. */
+export function contextForMonth(month: string): AnalyticsContext {
+  const dataset = getDataset();
+  const filters = parseFilters(
+    new URLSearchParams({ preset: "month", month }),
+    buildParseFiltersContext(dataset),
+  );
+  return buildContext(filters);
+}
+
+/** Branch and month together. */
+export function contextFor(branchId: string, month: string): AnalyticsContext {
+  const dataset = getDataset();
+  const filters = parseFilters(
+    new URLSearchParams({ branch: branchId, preset: "month", month }),
+    buildParseFiltersContext(dataset),
+  );
+  return buildContext(filters);
+}

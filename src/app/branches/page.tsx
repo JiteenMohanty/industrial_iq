@@ -25,14 +25,19 @@ export default async function BranchesPage({
     computePromiseReliabilityByBranch(ctx).map((r) => [r.branchId, r]),
   );
 
+  // Baselines come from windowLeads — all branches, same time range as the rows themselves — so a
+  // status mark compares like with like when the reader narrows to a month.
   const groupConversion = rate(
-    ctx.groupLeads.filter((l) => l.reachedStages.has("delivered")).length,
-    ctx.groupLeads.length,
+    ctx.windowLeads.filter((l) => l.reachedStages.has("delivered")).length,
+    ctx.windowLeads.length,
   );
-  const groupContact = rate(ctx.groupLeads.filter((l) => l.wasContacted).length, ctx.groupLeads.length);
+  const groupContact = rate(
+    ctx.windowLeads.filter((l) => l.wasContacted).length,
+    ctx.windowLeads.length,
+  );
   const groupTd = rate(
-    ctx.groupLeads.filter((l) => l.tookTestDrive).length,
-    ctx.groupLeads.filter((l) => l.wasContacted).length,
+    ctx.windowLeads.filter((l) => l.tookTestDrive).length,
+    ctx.windowLeads.filter((l) => l.wasContacted).length,
   );
 
   interface Row {
@@ -55,7 +60,7 @@ export default async function BranchesPage({
 
   const rows: Row[] = gates.map((g) => {
     const branch = ctx.dataset.branchById.get(g.branchId);
-    const leads = ctx.dataset.leadsByBranch.get(g.branchId) ?? [];
+    const leads = ctx.windowLeads.filter((l) => l.branchId === g.branchId);
     const delivered = leads.filter((l) => l.reachedStages.has("delivered"));
     const revenue = delivered.reduce((s, l) => s + l.dealValue, 0);
     const targetUnits = ctx.dataset.months.reduce(
@@ -188,7 +193,7 @@ export default async function BranchesPage({
       <SectionHeading
         title="Branch benchmark"
         as="h1"
-        hint="Full history for every branch, so the comparison is like-for-like regardless of the time filter. Ranked by revenue per lead — the efficiency figure that lead volume hides."
+        hint="Every branch on the selected time range, so the comparison stays like-for-like. Ranked by revenue per lead — the efficiency figure lead volume hides. The branch filter does not narrow this page: it exists to compare branches."
       />
 
       <section aria-label="Branch readings" className="grid gap-4 lg:grid-cols-3">

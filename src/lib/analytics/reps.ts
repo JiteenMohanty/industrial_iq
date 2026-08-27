@@ -33,16 +33,19 @@ export interface RepPerformance {
 }
 
 /**
- * Full-group, unfiltered by time or branch (`ctx.groupLeads`) — the same "structural comparison"
- * convention already established by `computeDeliveryByBranch`/`computeBranchSparklines`/
- * `computeFunnel`: a leaderboard comparing every rep only makes sense measured on the same,
- * unwindowed basis. `Filters` also has no rep dimension to window by even if this were desired.
+ * Scoped to the reader's current selection — branch and time both apply.
+ *
+ * "Show me this branch's reps in November" is exactly what a sales manager wants from a rep
+ * leaderboard, and refusing to answer it was the reason the global filter bar looked inert on this
+ * page. Sample-size guards elsewhere (`statusVsGroup` withholds a judgement under 15 leads) keep a
+ * narrow window from turning thin data into confident-looking verdicts.
+ *
  * Sorted by delivered count descending (the CEO's "who actually closes deals" question), then lead
  * volume descending, then name ascending as a deterministic final tiebreak — see decision-log.md.
  */
 export function computeRepPerformance(ctx: AnalyticsContext): RepPerformance[] {
   const rows = ctx.dataset.reps.map((rep) => {
-    const leads = ctx.groupLeads.filter((l) => l.assignedTo === rep.id);
+    const leads = ctx.leads.filter((l) => l.assignedTo === rep.id);
     const delivered = leads.filter((l) => l.reachedStages.has("delivered"));
     const open = leads.filter((l) => l.isOpen);
     const contacted = leads.filter((l) => l.wasContacted);
@@ -114,12 +117,19 @@ export interface RepDetail {
   assignedLeads: RepAssignedLead[];
 }
 
-/** Returns null for an unknown id so the route can render a not-found state rather than throwing. */
+/**
+ * Returns null for an unknown id so the route can render a not-found state rather than throwing.
+ *
+ * Reads `windowLeads`, not `leads`: this page is already scoped to one rep by its own URL path, so
+ * applying the branch filter on top could only ever empty it — a reader who lands here from a
+ * branch page and then clears the branch filter should still see the same rep. The time filter
+ * still applies.
+ */
 export function computeRepDetail(ctx: AnalyticsContext, repId: string): RepDetail | null {
   const rep = ctx.dataset.repById.get(repId);
   if (!rep) return null;
 
-  const leads = ctx.groupLeads.filter((l) => l.assignedTo === repId);
+  const leads = ctx.windowLeads.filter((l) => l.assignedTo === repId);
   const delivered = leads.filter((l) => l.reachedStages.has("delivered"));
   const open = leads.filter((l) => l.isOpen);
   const contacted = leads.filter((l) => l.wasContacted);

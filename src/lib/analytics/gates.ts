@@ -65,10 +65,9 @@ const rate = (numerator: number, denominator: number): number | null =>
 
 /**
  * Computes the gates over an explicit lead pool. Callers pass the scope they mean — the Overview
- * uses `groupLeads` (whole business, unfiltered, so the headline never shrinks because a reader
- * picked a narrow month), a branch page passes that branch's leads. Keeping the pool an argument
- * rather than reading a fixed scope off `ctx` is what lets one function serve both without the
- * scope-confusion bug ADR-0005 exists to prevent.
+ * passes the branch-scoped detection pool, a branch page passes that branch's leads. Keeping the
+ * pool an argument rather than reading a fixed scope off `ctx` is what lets one function serve
+ * both without the scope-confusion bug ADR-0005 exists to prevent.
  */
 export function computeGatesFor(leads: readonly EnrichedLead[]): GateAnalysis {
   const total = leads.length;
@@ -134,15 +133,16 @@ export function computeGatesFor(leads: readonly EnrichedLead[]): GateAnalysis {
 }
 
 /**
- * Group-wide gates, always measured on the unfiltered dataset.
+ * Gates for the reader's branch selection, across all time.
  *
- * Deliberately not window-scoped, for the same reason problem detection isn't (FR-009): the gate
- * story is a structural fact about how this business loses money, and a reader selecting "last 30
- * days" must not be shown a version of it that looks smaller than it is. Branch scoping is
- * offered explicitly through `computeGatesFor`.
+ * Responds to the branch filter but deliberately **not** to the time filter — the same rule
+ * problem detection follows (FR-009). The gate story is a structural fact about how this business
+ * loses money; a reader selecting "last 30 days" must not be shown a smaller version of it and
+ * conclude the leak is smaller than it is. Every view that renders this states the basis inline
+ * rather than leaving the reader to infer it from a control that appears to have done nothing.
  */
 export function computeGates(ctx: AnalyticsContext): GateAnalysis {
-  return computeGatesFor(ctx.groupLeads);
+  return computeGatesFor(ctx.detectionLeads);
 }
 
 export interface BranchGateRow {
@@ -158,10 +158,16 @@ export interface BranchGateRow {
   preTestDriveLostValueRupees: number;
 }
 
-/** Per-branch view of the same three gates — the comparison behind the Overview's branch table. */
+/**
+ * Per-branch view of the same three gates — the comparison behind the Overview's branch table.
+ *
+ * Built from `windowLeads`, so the table responds to the time filter while still ranking every
+ * branch. It deliberately ignores the branch filter: this table exists *to compare branches*, and
+ * filtering it to one row would destroy the only thing it does.
+ */
 export function computeBranchGates(ctx: AnalyticsContext): BranchGateRow[] {
   return ctx.dataset.branches.map((branch) => {
-    const leads = ctx.dataset.leadsByBranch.get(branch.id) ?? [];
+    const leads = ctx.windowLeads.filter((l) => l.branchId === branch.id);
     const g = computeGatesFor(leads);
     const delivered = leads.filter((l) => l.reachedStages.has("delivered")).length;
     return {

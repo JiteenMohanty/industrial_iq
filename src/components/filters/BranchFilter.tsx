@@ -9,10 +9,11 @@ interface BranchOption {
 
 /**
  * FR-027's single-branch scope, as a plain native `<select>` writing `?branch=` on the current
- * pathname — same URL-driven pattern as `TimeRangeFilter`. On `/branches/[branchId]` and
- * `/reps/[repId]` this control is inert (those routes force their own branch scope from the route
- * segment regardless of `?branch=`, per decision-log.md's T090/T091 entry) — a deliberate
- * simplification rather than remapping the dropdown's target path per-route.
+ * pathname — same URL-driven pattern as `TimeRangeFilter`.
+ *
+ * Visibility is decided by `FilterBar`, which hides this control on the routes where it cannot
+ * apply (single-entity detail pages, which scope from their own path, and the branch comparison,
+ * which exists to show every branch). It used to render everywhere and do nothing on most of them.
  */
 export function BranchFilter({ branches }: { branches: readonly BranchOption[] }) {
   const pathname = usePathname();

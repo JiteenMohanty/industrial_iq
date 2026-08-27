@@ -1554,3 +1554,31 @@ generated utility references, and these are consumed only from an inline `style`
 
 **Alternatives considered**: Emitting utility classes for all sixteen values so `@theme` would keep
 them — rejected as sixteen single-use classes existing only to defeat tree-shaking.
+
+## 2026-08-26 · Phase 8 · T290 — The global filter bar was inert on five of eight pages
+
+**Decision**: Give every analytics function a deliberate filter scope, and make the filter bar
+route-aware so it never shows a control that does nothing.
+
+**Reasoning**: Raised by the user, who tried the Branch control and noticed the page did not change.
+The audit confirmed it and found it worse than reported: the time range reached only the Overview's
+KPI tiles, because nearly every function read `ctx.groupLeads`. The "structural comparison"
+rationale in several doc comments was real for the cross-branch tables and post-hoc everywhere else.
+A control that silently does nothing is worse than no control — it reads as broken, and it quietly
+undermines trust in every number beside it.
+
+The fix is three scope classes (see ADR-0015), a new `windowLeads` pool so comparison baselines come
+from the same period as the figures they judge, and a route-aware bar that hides inapplicable
+controls and states the scope where a filter is deliberately ignored.
+
+**Alternatives considered**: (a) Hide the filter bar on the pages where it did nothing — the
+cheapest fix, and the one the user offered. Rejected because "what did this branch's customers want
+in November" is a question the product should answer, and hiding the control would have locked in
+the wrong answer. (b) Make every function respect both filters uniformly — rejected because it would
+have broken FR-009 (alerts must not vanish behind a narrow window) and destroyed the cross-branch
+comparison tables. The three-class model keeps both properties and makes each one explicit.
+
+**Follow-on defect found while fixing**: `computeChannelPerformance` fed the channel-quality
+detection rule by projecting `computeSourcePerformance`. Once the latter became time-scoped, the
+rule would have inherited the reader's time window and silently stopped firing under a narrow one.
+Split into its own detection-scoped pass and pinned by a test asserting it ignores the time filter.

@@ -24,7 +24,7 @@ export interface BranchDeliveryPerf {
 }
 
 export function computeDeliveryOps(ctx: AnalyticsContext): DeliveryOpsResult {
-  const deliveries = ctx.groupDeliveries;
+  const deliveries = ctx.deliveries;
   const days = deliveries.map((d) => d.daysToDeliver);
   const delayed = deliveries.filter((d) => d.isDelayed);
 
@@ -38,7 +38,7 @@ export function computeDeliveryOps(ctx: AnalyticsContext): DeliveryOpsResult {
 }
 
 export function computeDelayReasons(ctx: AnalyticsContext): DelayReasonBucket[] {
-  const delayed = ctx.groupDeliveries.filter((d) => d.isDelayed && d.delayReason);
+  const delayed = ctx.deliveries.filter((d) => d.isDelayed && d.delayReason);
   const byReason = new Map<string, number>();
   for (const d of delayed) {
     const reason = d.delayReason as string;
@@ -56,7 +56,7 @@ export function computeDelayReasons(ctx: AnalyticsContext): DelayReasonBucket[] 
 
 export function computeDeliveryByBranch(ctx: AnalyticsContext): BranchDeliveryPerf[] {
   return ctx.dataset.branches.map((branch) => {
-    const deliveries = ctx.groupDeliveries.filter((d) => d.lead.branchId === branch.id);
+    const deliveries = ctx.windowDeliveries.filter((d) => d.lead.branchId === branch.id);
     const days = deliveries.map((d) => d.daysToDeliver);
     const delayed = deliveries.filter((d) => d.isDelayed);
 
@@ -128,7 +128,7 @@ function medianOrNull(values: readonly number[]): number | null {
 }
 
 export function computePromiseReliability(ctx: AnalyticsContext): PromiseReliability {
-  return reliabilityOf(ctx.groupLeads);
+  return reliabilityOf(ctx.leads);
 }
 
 export function computePromiseReliabilityByBranch(
@@ -139,7 +139,7 @@ export function computePromiseReliabilityByBranch(
       branchId: branch.id,
       branchName: branch.name,
       branchLabel: branch.label,
-      ...reliabilityOf(ctx.dataset.leadsByBranch.get(branch.id) ?? []),
+      ...reliabilityOf(ctx.windowLeads.filter((l) => l.branchId === branch.id)),
     }))
     .sort((a, b) => (a.latePct ?? 0) - (b.latePct ?? 0));
 }
@@ -152,7 +152,7 @@ export interface SlipBucket {
 }
 
 export function computeSlipDistribution(ctx: AnalyticsContext): SlipBucket[] {
-  const slips = ctx.groupLeads
+  const slips = ctx.leads
     .map((l) => l.closeSlipDays)
     .filter((v): v is number => v !== null);
   const buckets: { label: string; test: (s: number) => boolean; isLate: boolean }[] = [

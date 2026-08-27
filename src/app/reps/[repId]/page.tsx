@@ -4,7 +4,7 @@ import { resolvePage, type SearchParams } from "@/lib/filters/page-context";
 import { buildHref } from "@/lib/filters/parse";
 import { computeRepDetail, computeRepPerformance } from "@/lib/analytics/reps";
 import { computeFunnel } from "@/lib/analytics/funnel";
-import { computeGates } from "@/lib/analytics/gates";
+import { computeGatesFor } from "@/lib/analytics/gates";
 import { computeLeadDetail } from "@/lib/analytics/leads";
 import { median } from "@/lib/analytics/benchmark";
 import { formatCount, formatCurrency, formatPercent } from "@/lib/format";
@@ -29,9 +29,10 @@ export default async function RepDetailPage({
   const detail = computeRepDetail(ctx, repId);
   if (!detail) notFound();
 
-  const groupFunnel = computeFunnel(ctx);
+  const groupFunnel = computeFunnel(ctx, { pool: "window" });
   const repFunnel = computeFunnel(ctx, { repId });
-  const gates = computeGates(ctx);
+  // Every branch in the window — not computeGates(ctx), which follows the shared branch filter.
+  const gates = computeGatesFor(ctx.windowLeads);
 
   const peers = computeRepPerformance(ctx).filter(
     (r) => r.branchId === detail.branchId && r.role === "sales_officer" && r.leadCount > 0,

@@ -114,7 +114,7 @@ export default async function ModelsPage({
       <SectionHeading
         title="Customer demand"
         as="h1"
-        hint="What customers ask about, where that interest lands, and which of it turns into revenue. Full history — not scoped by the time filter, so the mix is measured on the same basis throughout."
+        hint="What customers ask about, where that interest lands, and which of it turns into revenue. Scoped by both filters — shares always sum to 100% of the selection on screen."
       />
 
       <section aria-label="Demand headlines">

@@ -90,7 +90,7 @@ function medianOf(values: readonly number[]): number | null {
 
 export function computeRevenueTrend(ctx: AnalyticsContext): RevenueTrendPoint[] {
   return ctx.dataset.months.map((month) => {
-    const deliveries = ctx.groupDeliveries.filter((d) => d.deliveryMonth === month);
+    const deliveries = ctx.windowDeliveries.filter((d) => d.deliveryMonth === month);
     const branchIds = ctx.filters.branchId
       ? [ctx.filters.branchId]
       : ctx.dataset.branches.map((b) => b.id);
@@ -114,7 +114,7 @@ export function computeRevenueTrend(ctx: AnalyticsContext): RevenueTrendPoint[] 
       ),
       targetUnits,
       attainmentPct: targetUnits === 0 ? null : (scoped.length / targetUnits) * 100,
-      leadsCreated: ctx.groupLeads.filter(
+      leadsCreated: ctx.windowLeads.filter(
         (l) =>
           l.createdAt.toISOString().slice(0, 7) === month &&
           (!ctx.filters.branchId || l.branchId === ctx.filters.branchId),
@@ -147,7 +147,7 @@ const MATURITY_DAYS = 45;
 
 export function computeGateTrend(ctx: AnalyticsContext): GateTrendPoint[] {
   return ctx.dataset.months.map((month) => {
-    const leads = ctx.groupLeads.filter(
+    const leads = ctx.windowLeads.filter(
       (l) =>
         l.createdAt.toISOString().slice(0, 7) === month &&
         (!ctx.filters.branchId || l.branchId === ctx.filters.branchId),

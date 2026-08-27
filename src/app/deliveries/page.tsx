@@ -49,7 +49,7 @@ export default async function DeliveriesPage({
   const branchRevenue = new Map(
     ctx.dataset.branches.map((b) => [
       b.id,
-      ctx.groupDeliveries
+      ctx.windowDeliveries
         .filter((d) => d.lead.branchId === b.id)
         .reduce((s, d) => s + d.lead.dealValue, 0),
     ]),

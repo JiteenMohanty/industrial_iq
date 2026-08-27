@@ -14,6 +14,10 @@ import { rate, mean, median } from "./benchmark";
  * a tight, near-non-overlapping band), so "average deal value" is really a mix indicator, not a
  * discounting or negotiation indicator. The UI says so where it matters rather than implying reps
  * are winning better prices.
+ *
+ * Scope: every function here reads the reader's current selection (branch + time). Demand mix is a
+ * population view — "what did Lakeside's customers ask about in November" is the question this page
+ * exists to answer — so both filters apply and revenue shares sum to 100% of what is on screen.
  */
 export interface ModelPerformance {
   model: string;
@@ -36,7 +40,7 @@ export interface ModelPerformance {
 }
 
 export function computeModelPerformance(ctx: AnalyticsContext): ModelPerformance[] {
-  const leads = ctx.groupLeads;
+  const leads = ctx.leads;
   const totalRevenue = leads
     .filter((l) => l.reachedStages.has("delivered"))
     .reduce((s, l) => s + l.dealValue, 0);
@@ -132,7 +136,7 @@ export function computeInterestMatrix(
   dimension: HeatmapDimension,
   metric: HeatmapMetric,
 ): HeatmapMatrix {
-  const leads = ctx.groupLeads;
+  const leads = ctx.leads;
 
   const colDefs =
     dimension === "branch"
@@ -239,7 +243,7 @@ export function computeModelTrend(ctx: AnalyticsContext): ModelTrendPoint[] {
   return ctx.dataset.months.map((month) => {
     const byModel: Record<string, number> = {};
     for (const model of ctx.dataset.models) {
-      byModel[model] = ctx.groupLeads.filter(
+      byModel[model] = ctx.leads.filter(
         (l) => l.modelInterested === model && l.createdAt.toISOString().slice(0, 7) === month,
       ).length;
     }
@@ -261,7 +265,7 @@ export interface AspPoint {
 
 export function computeAspTrend(ctx: AnalyticsContext): AspPoint[] {
   return ctx.dataset.months.map((month) => {
-    const delivered = ctx.groupDeliveries.filter((d) => d.deliveryMonth === month);
+    const delivered = ctx.deliveries.filter((d) => d.deliveryMonth === month);
     return {
       month,
       label: monthLabel(month),

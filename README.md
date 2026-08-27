@@ -50,7 +50,7 @@ npm run test
 npm run lint
 ```
 
-226 tests across 34 files. They cover the analytics and insight layers against figures verified
+287 tests across 35 files. They cover the analytics and insight layers against figures verified
 directly from the dataset, plus a design-token contrast suite that asserts every text/background
 pair clears its WCAG 2.1 AA floor in both themes.
 
@@ -89,7 +89,10 @@ Everything is computed on the server. `lib/data/dataset.ts` is the only module t
 dataset and carries a `server-only` guard, so an accidental client import fails the build; the
 620 KB file never reaches the browser. The URL is the only view state — time range, branch, heatmap
 dimension, trend metric, lead cohort, sort — so every view is reproducible and shareable by address,
-and there is no client filter store anywhere. Most charts are server-rendered HTML/CSS or inline
+and there is no client filter store anywhere. Each analytics function has a deliberate filter scope
+(population views follow branch and time; alerts and gates follow branch only so a narrow window
+cannot hide a live problem; cross-branch tables follow time only so they still rank every branch),
+and the filter bar hides any control that would not affect the page you are on. Most charts are server-rendered HTML/CSS or inline
 SVG with native tooltips, so seven of nine routes ship no chart JavaScript at all (~106 kB first
 load); Recharts is used only where a crosshair or scatter tooltip genuinely earns its weight.
 

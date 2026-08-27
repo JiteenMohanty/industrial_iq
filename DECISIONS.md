@@ -155,6 +155,27 @@ correct before a probabilistic one sits on top of it.
 revenue and cycle time on two scales. Two measures of different magnitude on one plot invite the
 reader to see a relationship the axes invented.
 
+**Every view has a stated filter scope, and the filter bar only shows what applies.** A global
+control that silently does nothing is worse than no control, so each analytics function has a
+deliberate answer to "does this respond to branch, and to time":
+
+| Scope | Applies to | Rule |
+|---|---|---|
+| Branch **and** time | KPIs, funnel, demand, sources, reps, delivery operations | Population views — "what did this branch's customers want in November" is a real question |
+| Branch only | Alerts, the gate breakdown, stuck orders, the lead explorer | Present-tense state. A live problem must not vanish because someone picked "last 30 days" (FR-009), and the lead explorer must match the alert scope exactly or an evidence link would show fewer rows than its alert claimed |
+| Time only | Cross-branch comparison tables | They exist to rank every branch; narrowing to one row removes the only thing they do |
+
+Where a page ignores a filter, the bar says so in a line beside the controls, and the branch
+control is hidden entirely on the two single-entity detail pages (which scope from their own URL)
+and on the branch comparison. The contract is asserted function by function, in both directions, in
+`tests/filters/scope-coverage.spec.ts` — 61 assertions.
+
+This was a defect in my own first pass at v2, not a v1 leftover: nearly every analytics function
+read the unfiltered group pool, so the shared Time range / Branch controls were inert on five of
+eight pages while still being displayed on all of them. It was caught by a reader trying the
+control and noticing nothing moved, which is the cheapest possible bug report and one I should have
+run myself.
+
 **Kept what was right.** The v1 data layer — parsing, enrichment, indexing, memoisation, the
 `server-only` guard — survives essentially unchanged, as do all nine original detection rules and
 their thresholds. The audit found no defect in them. Rewriting correct code to make a rebuild look
@@ -326,9 +347,9 @@ code path, never from an analysis script or a formatted string.*
 
 | Check | Result |
 |---|---|
-| Test suite | 226 passing across 34 files |
+| Test suite | 287 passing across 35 files |
 | Production build | Clean, 12 routes, TypeScript strict, no errors |
-| Route smoke test | 32 URL variants including malformed params, unknown ids and a zero-result range — rendered output parsed for `NaN`/`Infinity`/`undefined`: none |
+| Route smoke test | 41 URL variants including malformed params, unknown ids and a zero-result range — rendered output parsed for `NaN`/`Infinity`/`undefined`: none |
 | Horizontal overflow | Measured 0px on every route at 1440 / 1024 / 768 — after finding and fixing 199px on `/models` |
 | Contrast | 14 assertions over every token pair in both themes, in `tests/design/contrast.spec.ts` — after finding and fixing three real failures |
 | Client payload | Dataset absent from every chunk; seven of nine routes at ~106 kB |

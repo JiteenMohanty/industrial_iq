@@ -31,11 +31,14 @@ export interface FunnelResult {
  */
 export function computeFunnel(
   ctx: AnalyticsContext,
-  scope?: { branchId?: string; repId?: string },
+  scope?: { branchId?: string; repId?: string; pool?: "selection" | "window" },
 ): FunnelResult {
-  let leads = ctx.groupLeads;
-  if (scope?.branchId) leads = leads.filter((l) => l.branchId === scope.branchId);
-  if (scope?.repId) leads = leads.filter((l) => l.assignedTo === scope.repId);
+  // Default pool is the reader's selection (branch + time). `pool: "window"` gives the
+  // all-branches figure for the same period, which is what a branch overlay must be compared
+  // against -- comparing a branch to itself would make every overlay flat.
+  let leads = scope?.pool === "window" ? ctx.windowLeads : ctx.leads;
+  if (scope?.branchId) leads = ctx.windowLeads.filter((l) => l.branchId === scope.branchId);
+  if (scope?.repId) leads = ctx.windowLeads.filter((l) => l.assignedTo === scope.repId);
 
   const top = leads.length;
   let prevCount = top;
@@ -67,7 +70,7 @@ export interface StageDuration {
 
 /** Time between consecutive stage timestamps, over leads that reached both. */
 export function computeStageDurations(ctx: AnalyticsContext): StageDuration[] {
-  const leads = ctx.groupLeads;
+  const leads = ctx.leads;
   const durations: StageDuration[] = [];
 
   for (let i = 0; i < FUNNEL_STAGES.length - 1; i++) {
@@ -124,7 +127,7 @@ export interface LossBreakdown {
  * already status_history-derived, so this needs no special-casing here.
  */
 export function computeLossBreakdown(ctx: AnalyticsContext): LossBreakdown {
-  const lost = ctx.groupLeads.filter((l) => l.isLost);
+  const lost = ctx.leads.filter((l) => l.isLost);
 
   const byStageMap = new Map<Stage, number>();
   for (const lead of lost) {

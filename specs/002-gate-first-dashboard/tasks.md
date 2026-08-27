@@ -91,7 +91,7 @@ Status reflects the shipped state. `[X]` = done and verified; `[ ]` = not done, 
 ## Phase 6 — Validation
 
 - [X] T260 `npm run build` clean; 12 routes; TypeScript clean.
-- [X] T261 Test suite: 226 passing across 34 files, including new suites for gates, models,
+- [X] T261 Test suite: 287 passing across 35 files (226 at the end of Phase 6; the rest added by Phase 8), including new suites for gates, models,
   promise reliability, benchmark, lead queries, headline selection, and both new rules.
 - [X] T262 Route smoke test over 32 URL variants — including malformed params, unknown ids and a
   zero-result range — parsing rendered output for `NaN` / `Infinity` / `undefined` and for expected
@@ -115,6 +115,36 @@ Status reflects the shipped state. `[X]` = done and verified; `[ ]` = not done, 
 - [X] T271 Write this spec set (`spec.md`, `plan.md`, `tasks.md`), superseding `001`.
 - [X] T272 Rewrite `DECISIONS.md` for the second submission.
 - [X] T273 Update `README.md`.
+
+## Phase 8 — Filter scope correction (post-review)
+
+Raised by the user after the rebuild: the global filter bar was displayed on every page but only
+changed anything on three of them. Investigation confirmed it, and found it was worse than reported
+— the time range reached only the Overview's KPI tiles.
+
+- [X] T290 Audit every analytics function's data scope. Found nearly all of them reading the
+  unfiltered `groupLeads` pool, making the shared controls inert on `/funnel`, `/models`,
+  `/sources`, `/reps` and most of `/deliveries`.
+- [X] T291 Add `windowLeads`/`windowDeliveries` (time-scoped, all branches) to `AnalyticsContext` —
+  the correct baseline for a comparison made inside a selected window.
+- [X] T292 Rewire population views (funnel, stage durations, loss breakdown, models, sources, reps,
+  delivery ops, promise reliability, revenue trend) onto the reader's selection.
+- [X] T293 Keep present-tense state on branch-only scope (alerts, gates, stuck orders, lead
+  explorer) and give `computeChannelPerformance` its own detection-scoped pass, so the
+  channel-quality rule stays FR-009-compliant rather than inheriting the page's time window.
+- [X] T294 Move cross-branch comparison tables onto `windowLeads` so they follow the time filter
+  while still ranking every branch.
+- [X] T295 Repoint funnel baselines at `pool: "window"` on `/funnel`, `/branches/[id]` and
+  `/reps/[id]` — otherwise a reader with the branch filter set would see a branch compared against
+  itself.
+- [X] T296 Make the filter bar route-aware: hide the branch control on the two single-entity detail
+  pages and on the branch comparison, and state the scope inline where a filter is deliberately
+  ignored.
+- [X] T297 `tests/filters/scope-coverage.spec.ts` — 61 assertions covering 20 functions in both
+  directions, plus coherence checks (shares sum to the selection, a branch overlay is measured
+  against all branches, zero-result windows do not throw).
+- [X] T298 Verify per route that the rendered output actually changes: branch and time both move
+  every page except the two deliberate exceptions. Smoke test extended to 41 URL variants.
 
 ## Not done
 

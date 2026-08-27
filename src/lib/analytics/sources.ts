@@ -50,12 +50,15 @@ export function sourceLabel(source: Source): string {
 }
 
 /**
- * Full-group and unfiltered, matching the structural-comparison convention used by every other
- * cross-entity comparison in the product: a side-by-side ranking of sources is only meaningful
- * measured on the same basis for all of them.
+ * Scoped to the reader's current selection — branch and time both apply.
+ *
+ * Channel performance is a population view: "which channels worked for this branch, in this
+ * period" is a legitimate and useful question, and answering it is why the global filter bar is
+ * shown on this page at all. Shares (volume, revenue) are computed within the same scope, so they
+ * always sum to 100% of what the reader is actually looking at.
  */
 export function computeSourcePerformance(ctx: AnalyticsContext): SourcePerformance[] {
-  const leads = ctx.groupLeads;
+  const leads = ctx.leads;
   const total = leads.length;
   const totalRevenue = leads
     .filter((l) => l.reachedStages.has("delivered"))
@@ -63,7 +66,7 @@ export function computeSourcePerformance(ctx: AnalyticsContext): SourcePerforman
 
   return ctx.dataset.sources
     .map((source) => {
-      const ls = ctx.dataset.leadsBySource.get(source) ?? [];
+      const ls = leads.filter((l) => l.source === source);
       const contacted = ls.filter((l) => l.wasContacted);
       const testDriven = ls.filter((l) => l.tookTestDrive);
       const delivered = ls.filter((l) => l.reachedStages.has("delivered"));
@@ -94,9 +97,14 @@ export function computeSourcePerformance(ctx: AnalyticsContext): SourcePerforman
 }
 
 /**
- * Narrow shape retained for the channel-quality detection rule and its tests, which only need
- * volume share and raw conversion. Kept as a projection of the full computation rather than a
- * second, separately-maintained pass over the leads.
+ * Narrow shape for the channel-quality detection rule, which needs only volume share and raw
+ * conversion.
+ *
+ * Deliberately computed over `detectionLeads` (branch-scoped, never time-scoped) rather than by
+ * projecting `computeSourcePerformance`, which follows the reader's time window. Alerts must
+ * evaluate the current state of the business regardless of the selected period (FR-009); a rule
+ * that quietly stopped firing because someone picked "last 30 days" would be a silent correctness
+ * bug, which is exactly what ADR-0005's scope separation exists to prevent.
  */
 export interface ChannelPerformance {
   channel: Source;
@@ -107,13 +115,20 @@ export interface ChannelPerformance {
 }
 
 export function computeChannelPerformance(ctx: AnalyticsContext): ChannelPerformance[] {
-  return computeSourcePerformance(ctx)
-    .map((s) => ({
-      channel: s.source,
-      totalLeads: s.totalLeads,
-      deliveredCount: s.deliveredCount,
-      conversionPct: s.conversionPct ?? 0,
-      volumeSharePct: s.volumeSharePct ?? 0,
-    }))
+  const leads = ctx.detectionLeads;
+  const total = leads.length;
+
+  return ctx.dataset.sources
+    .map((source) => {
+      const ls = leads.filter((l) => l.source === source);
+      const delivered = ls.filter((l) => l.reachedStages.has("delivered"));
+      return {
+        channel: source,
+        totalLeads: ls.length,
+        deliveredCount: delivered.length,
+        conversionPct: rate(delivered.length, ls.length) ?? 0,
+        volumeSharePct: rate(ls.length, total) ?? 0,
+      };
+    })
     .sort((a, b) => b.conversionPct - a.conversionPct);
 }
