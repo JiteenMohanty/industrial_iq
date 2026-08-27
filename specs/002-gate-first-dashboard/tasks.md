@@ -176,6 +176,22 @@ callouts, and a seasonality reading if the data supported one.
 - [X] T308 Tests: 16 for seasonality and head-to-head, 3 for the currency regression, both new
   functions added to the filter-scope contract. 311 passing across 36 files.
 
+## Phase 10 — In-place controls no longer scroll to the top (post-review)
+
+- [X] T310 Introduce `ViewLink` and route every in-place control through it: segmented controls,
+  table sort headers, the alert-feed disclosure, and table rows that open the lead sheet. Plain
+  `Link` is retained wherever the click genuinely navigates.
+- [X] T311 `router.push(href, { scroll: false })` for the two filter selects and for closing the
+  lead detail sheet.
+- [X] T312 Replace `/leads`' raw `<a>` "Clear entity filters" — it was forcing a full document
+  reload rather than a client navigation.
+- [X] T313 `tests/ui/scroll-behaviour.spec.ts` — 19 assertions pinning the convention, including
+  that `scroll={false}` is written in exactly one file and that no page uses a raw anchor for an
+  internal route.
+- [X] T314 Payload-level verification (the browser pane here does not complete streaming hydration,
+  so runtime checks are unreliable in it): `scroll:false` reaches `next/link` for exactly the
+  intended links and no others, across all eight routes.
+
 ## Not done
 
 - [ ] T280 Live human 30-second storytelling test. Needs a reader who has not seen the data; the

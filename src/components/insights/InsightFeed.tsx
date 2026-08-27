@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { ViewLink } from "@/components/ui/ViewLink";
 import type { Insight } from "@/lib/insights/types";
 import type { Filters } from "@/lib/filters/types";
 import { buildHref } from "@/lib/filters/parse";
@@ -69,17 +69,20 @@ export function InsightFeed({
           )}
         </span>
         {remaining > 0 && !expanded && (
-          <Link
+          <ViewLink
             href={buildHref(pathname, filters, undefined, { insights: "all" })}
             className="font-medium text-accent hover:underline"
           >
             Show all {insights.length} →
-          </Link>
+          </ViewLink>
         )}
         {expanded && (
-          <Link href={buildHref(pathname, filters)} className="font-medium text-accent hover:underline">
+          <ViewLink
+            href={buildHref(pathname, filters)}
+            className="font-medium text-accent hover:underline"
+          >
             Show top {limit} only
-          </Link>
+          </ViewLink>
         )}
       </div>
     </div>

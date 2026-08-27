@@ -166,6 +166,7 @@ export default async function DeliveriesPage({
             emptyTitle="No stuck orders"
             emptyBody="Every order placed in this selection has a matching delivery record."
             minWidth={720}
+            rowPreservesScroll
             caption="Orders placed without a delivery"
           />
         </Card>

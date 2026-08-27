@@ -200,6 +200,7 @@ export default async function RepDetailPage({
                   buildHref(`/reps/${repId}`, filters, undefined, { lead: r.leadId })
                 }
                 minWidth={840}
+                rowPreservesScroll
                 caption={`Leads assigned to ${detail.repName}`}
               />
             </Card>

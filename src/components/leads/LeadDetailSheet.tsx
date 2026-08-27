@@ -31,7 +31,9 @@ export function LeadDetailSheet({
   closeHref: string;
 }) {
   const router = useRouter();
-  const close = () => router.push(closeHref);
+  // scroll: false — closing the sheet must return the reader to the row they opened it from,
+  // not to the top of a long lead table.
+  const close = () => router.push(closeHref, { scroll: false });
 
   return (
     <Sheet open={lead !== null} onClose={close} title={lead ? lead.customerName : "Lead detail"}>

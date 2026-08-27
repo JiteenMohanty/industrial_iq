@@ -1640,3 +1640,51 @@ unreachable — the smallest monetary figure anywhere in the product was a deal 
 until revenue per lead made it live, at which point it rendered `₹45,909.091`: three decimal places
 of false precision on a derived average. Rounded, and given a regression test covering the branch
 and both threshold boundaries.
+
+## 2026-08-27 · Phase 10 · T310 — Every in-place control scrolled the reader back to the top
+
+**Decision**: Introduce `ViewLink` — a link that changes the current view rather than navigating —
+and route every in-place control through it.
+
+**Reasoning**: Reported by the user against the trend-metric control, and correctly identified as
+site-wide. Switching a chart's measure, sorting a table, changing the heatmap dimension, expanding
+the alert feed or opening a lead sheet all jumped the reader back to the top of the page. The data
+changed correctly; the interaction felt broken.
+
+The cause is a direct consequence of a design decision this product is otherwise built on. The URL
+is the only view state (Constitution VI), which is what makes every view shareable — but it means
+Next.js cannot distinguish "go to the branch page" from "switch this chart to units". Both are
+`<Link>` navigations, and its default is to scroll to the top of the document. Correct for the
+first, wrong for the second.
+
+Rather than sprinkle `scroll={false}` at call sites and rely on future discipline, the distinction
+is drawn in the type system: `ViewLink` for controls that change the current page, plain `Link` for
+navigation. A new control that changes the page it lives on uses `ViewLink`; nothing else has to
+think about scroll at all. `tests/ui/scroll-behaviour.spec.ts` asserts the convention holds,
+including that `scroll={false}` appears in exactly one file.
+
+For imperative navigations (the two filter selects, closing the lead sheet) the same applies via
+`router.push(href, { scroll: false })`.
+
+**Second bug found while fixing it**: `/leads` rendered its "Clear entity filters" control as a raw
+`<a href="/leads?...">`. That is a full document reload, not a client navigation — slower, and it
+discards view state on the way. Replaced with `ViewLink`. A test now asserts no page uses a raw
+anchor for an internal route, with two documented exceptions: the skip link (a same-document
+fragment) and the CSV download (a real file response the router must not intercept).
+
+**Verification, and its limit**: the browser pane available here does not complete React's streaming
+suspense hydration — page content stays in its hidden `div#S:0` placeholder and never swaps into
+`<main>`, so every link in page content behaves as a plain anchor regardless of what it was compiled
+from. That is an artifact of the environment, not the product: the served HTML carries the correct
+`<!--$?-->` boundary and its matching `$RC("B:0","S:0")` completion script.
+
+So runtime scroll behaviour was verified at the payload level instead, which is browser-independent:
+`scroll:false` reaches `next/link` for exactly the intended links and no others — 5 on the Overview
+(four trend options plus the alert disclosure), 6 on Demand (two segmented controls), 6 on the
+funnel (branch overlay), 38 on Deliveries (stuck-order rows opening the sheet), 523 on Leads
+(cohorts, sort headers, and one per row), and zero on `/branches`, `/reps` and `/sources`, whose
+links all genuinely navigate. Final confirmation of the felt behaviour needs a real browser.
+
+Server response for a control change measures 16–160 ms, so the `loading.tsx` skeleton that a
+same-route parameter change re-triggers flashes briefly rather than reading as a reload. The
+skeletons are kept (FR-035).

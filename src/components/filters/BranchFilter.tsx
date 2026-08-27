@@ -27,7 +27,7 @@ export function BranchFilter({ branches }: { branches: readonly BranchOption[] }
     if (branchId) next.set("branch", branchId);
     else next.delete("branch");
     const query = next.toString();
-    router.push(query ? `${pathname}?${query}` : pathname);
+    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }
 
   return (

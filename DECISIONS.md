@@ -129,6 +129,15 @@ unfalsifiable. So every judgement is "ahead of / behind *this group*", and the g
 printed beside it. Entities below 15 leads get no mark at all rather than a caveated one — a rep
 with nine leads is not "underperforming", they are unmeasured.
 
+**The URL is the only view state — which had one cost, now paid.** Every control writes to the URL,
+which is what makes each view shareable by address. But it means Next.js cannot tell "go to the
+branch page" from "switch this chart to units": both are link navigations, and its default is to
+scroll to the top. Changing a chart measure halfway down a page threw the reader back to the top —
+the data updated correctly and the interaction felt broken. The distinction is now drawn in the type
+system rather than left to discipline: `ViewLink` for controls that change the current view,
+ordinary `Link` for navigation, with a test asserting `scroll={false}` is written in exactly one
+file.
+
 **Two peaks, not one, on the demand view.** Enquiries peak in November and deliveries peak in
 December — one month apart, which is what the 38-day median sales cycle predicts. Reported
 separately because a dealership planning stock needs the delivery peak while one planning contact
@@ -356,7 +365,7 @@ code path, never from an analysis script or a formatted string.*
 
 | Check | Result |
 |---|---|
-| Test suite | 311 passing across 36 files |
+| Test suite | 330 passing across 37 files |
 | Production build | Clean, 12 routes, TypeScript strict, no errors |
 | Route smoke test | 41 URL variants including malformed params, unknown ids and a zero-result range — rendered output parsed for `NaN`/`Infinity`/`undefined`: none |
 | Horizontal overflow | Measured 0px on every route at 1440 / 1024 / 768 — after finding and fixing 199px on `/models` |

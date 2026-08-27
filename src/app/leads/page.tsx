@@ -16,6 +16,7 @@ import { Callout } from "@/components/ui/Callout";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { Pill } from "@/components/ui/Badge";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { ViewLink } from "@/components/ui/ViewLink";
 import { LeadDetailSheet } from "@/components/leads/LeadDetailSheet";
 
 export const metadata = { title: "Leads · DealerPulse" };
@@ -169,12 +170,12 @@ export default async function LeadsPage({
             hint="Cohorts are the same definitions the detection rules use, so a list here and an alert there can never disagree."
             action={
               (repId || model || source || stage) && (
-                <a
+                <ViewLink
                   href={buildHref("/leads", filters, undefined, { cohort })}
                   className="text-xs font-medium text-accent hover:underline"
                 >
                   Clear entity filters
-                </a>
+                </ViewLink>
               )
             }
           />
@@ -222,6 +223,7 @@ export default async function LeadsPage({
           sortHref={sortHref}
           activeSort={sort}
           activeDir={dir}
+          rowPreservesScroll
           minWidth={1040}
           emptyTitle="No leads match this selection"
           emptyBody="Try a different cohort, or clear the branch and entity filters. This is an empty result, not an error."

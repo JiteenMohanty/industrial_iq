@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { ViewLink } from "./ViewLink";
 
 /**
  * URL-driven tab control — each option is a link, not a client state toggle.
@@ -27,11 +27,11 @@ export function SegmentedControl({
       {options.map((opt) => {
         const active = opt.key === activeKey;
         return (
-          <Link
+          <ViewLink
             key={opt.key}
             href={hrefFor(opt.key)}
-            aria-current={active ? "true" : undefined}
-            title={opt.title}
+            {...(active ? { ariaCurrent: "true" as const } : {})}
+            {...(opt.title ? { title: opt.title } : {})}
             className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
               // accent-solid, not accent: white-on-accent measures 3.6:1 at this size, below the
               // 4.5:1 text floor, and the themed hover step drops to 2.4:1 in dark mode.
@@ -42,7 +42,7 @@ export function SegmentedControl({
             }`}
           >
             {opt.label}
-          </Link>
+          </ViewLink>
         );
       })}
     </div>

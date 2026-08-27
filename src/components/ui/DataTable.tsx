@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ViewLink } from "./ViewLink";
 import type { ReactNode } from "react";
 import { EmptyState } from "./EmptyState";
 
@@ -35,6 +36,7 @@ export function DataTable<T>({
   activeDir,
   minWidth = 640,
   caption,
+  rowPreservesScroll = false,
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -47,6 +49,11 @@ export function DataTable<T>({
   activeDir?: "asc" | "desc";
   minWidth?: number;
   caption?: string;
+  /**
+   * True when clicking a row changes this same page (opening the lead detail sheet) rather than
+   * navigating elsewhere. Keeps the reader's scroll position where the row was.
+   */
+  rowPreservesScroll?: boolean;
 }) {
   if (rows.length === 0) {
     return <EmptyState title={emptyTitle} body={emptyBody} />;
@@ -77,7 +84,7 @@ export function DataTable<T>({
                   className={`px-3 py-2.5 align-bottom ${align} ${col.className ?? ""}`}
                 >
                   {col.sortKey && sortHref ? (
-                    <Link
+                    <ViewLink
                       href={sortHref(col.sortKey, nextDir)}
                       className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-ink-secondary hover:text-ink-primary"
                     >
@@ -85,7 +92,7 @@ export function DataTable<T>({
                       <span aria-hidden="true" className="text-[9px]">
                         {isActive ? (activeDir === "asc" ? "▲" : "▼") : "⇅"}
                       </span>
-                    </Link>
+                    </ViewLink>
                   ) : (
                     <span className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">
                       {col.header}
@@ -125,12 +132,21 @@ export function DataTable<T>({
                       {/* Only the first cell carries the row link — a whole row of nested anchors
                           is hostile to keyboard traversal and to screen-reader row navigation. */}
                       {href && ci === 0 ? (
-                        <Link
-                          href={href}
-                          className="font-medium text-ink-primary hover:text-accent hover:underline"
-                        >
-                          {content}
-                        </Link>
+                        rowPreservesScroll ? (
+                          <ViewLink
+                            href={href}
+                            className="font-medium text-ink-primary hover:text-accent hover:underline"
+                          >
+                            {content}
+                          </ViewLink>
+                        ) : (
+                          <Link
+                            href={href}
+                            className="font-medium text-ink-primary hover:text-accent hover:underline"
+                          >
+                            {content}
+                          </Link>
+                        )
                       ) : (
                         content
                       )}

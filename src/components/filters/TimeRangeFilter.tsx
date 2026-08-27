@@ -47,7 +47,9 @@ export function TimeRangeFilter({ minDate, maxDate }: { minDate: string; maxDate
     const next = new URLSearchParams(searchParams);
     mutate(next);
     const query = next.toString();
-    router.push(query ? `${pathname}?${query}` : pathname);
+    // scroll: false — the filter bar sits above the fold, but the reader may be anywhere on
+    // the page when they change the range, and a jump to the top reads as a reload.
+    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }
 
   function handleSelect(value: string) {
