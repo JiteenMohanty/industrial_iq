@@ -4,7 +4,7 @@ import { buildHref } from "@/lib/filters/parse";
 import { formatPercent } from "@/lib/format";
 import type { Insight } from "../types";
 import { THRESHOLDS } from "../thresholds";
-import { sumDealValue } from "../helpers";
+import { sumDealValue, evidenceHref } from "../helpers";
 
 export const slug = "channel-quality" as const;
 
@@ -49,7 +49,9 @@ export function run(ctx: AnalyticsContext): Insight[] {
       impactRupees: sumDealValue(lost),
       metric: { value: conversionPct, comparison: volumeSharePct, unit: "pct" },
       entity: { kind: "channel", id: channel, label: channel.replace("_", " ") },
-      href: buildHref("/funnel", ctx.filters),
+      href: buildHref("/sources", ctx.filters),
+      evidenceHref: evidenceHref(ctx.filters, "all", { source: channel }),
+      action: "Compare cost per lead against its revenue per lead before renewing this spend.",
       evidence: lost.map((l) => l.id),
     });
   }

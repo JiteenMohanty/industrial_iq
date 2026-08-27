@@ -3,7 +3,7 @@ import { buildHref } from "@/lib/filters/parse";
 import { formatPercent } from "@/lib/format";
 import type { Insight } from "../types";
 import { THRESHOLDS } from "../thresholds";
-import { sumDealValue, groupByBranch } from "../helpers";
+import { sumDealValue, groupByBranch, evidenceHref } from "../helpers";
 
 export const slug = "contact-rate" as const;
 
@@ -38,6 +38,8 @@ export function run(ctx: AnalyticsContext): Insight[] {
       metric: { value: ratePct, comparison: groupRatePct, unit: "pct" },
       entity: { kind: "branch", id: branchId, label: branch.label },
       href: buildHref(`/branches/${branchId}`, ctx.filters),
+      evidenceHref: evidenceHref(ctx.filters, "never_contacted", { branch: branchId }),
+      action: "Review this branch's lead-assignment process — the gap is at intake, not at closing.",
       evidence: uncontacted.map((l) => l.id),
     });
   }

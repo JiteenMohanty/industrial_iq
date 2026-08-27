@@ -1,131 +1,299 @@
-import Link from "next/link";
-import { getDataset } from "@/lib/data/dataset";
-import { buildContext } from "@/lib/analytics/context";
-import { parseFilters, buildParseFiltersContext, buildHref } from "@/lib/filters/parse";
-import { computeBranchSparklines } from "@/lib/analytics/trends";
-import { formatCurrency, formatCount, formatPercent } from "@/lib/format";
-import { DataTable, type Column } from "@/components/ui/DataTable";
+import { resolvePage, type SearchParams } from "@/lib/filters/page-context";
+import { buildHref } from "@/lib/filters/parse";
+import { computeBranchGates } from "@/lib/analytics/gates";
+import { computePromiseReliabilityByBranch } from "@/lib/analytics/deliveries";
+import { rankBy, statusVsGroup, rate } from "@/lib/analytics/benchmark";
+import { formatCount, formatCurrency, formatPercent } from "@/lib/format";
+import { Card, SectionHeading } from "@/components/ui/Card";
+import { Callout, Figure } from "@/components/ui/Callout";
+import { DataTable, type Column, MetricBar } from "@/components/ui/DataTable";
+import { StatusDot, RankBadge } from "@/components/ui/Badge";
 import { Sparkline } from "@/components/charts/Sparkline";
+import { RankedBar } from "@/components/charts/RankedBar";
 
-type SearchParams = { [key: string]: string | string[] | undefined };
+export const metadata = { title: "Branches · DealerPulse" };
 
-function toURLSearchParams(sp: SearchParams): URLSearchParams {
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(sp)) {
-    if (typeof value === "string") params.set(key, value);
-    else if (Array.isArray(value) && value[0] !== undefined) params.set(key, value[0]);
-  }
-  return params;
-}
-
-interface BranchRow {
-  branchId: string;
-  branchLabel: string;
-  href: string;
-  deliveredUnits: number;
-  deliveredRevenue: number;
-  conversionPct: number | null;
-  attainmentPct: number | null;
-  openPipelineValueRupees: number;
-  sparklinePoints: number[];
-}
-
-/**
- * Full-group comparison grid — deliberately unfiltered by time range, matching the convention
- * already established by `computeDeliveryByBranch`/`computeBranchSparklines`/`computeFunnel`
- * (ComparisonBar on the Overview follows the same rule): a side-by-side ranking of all five
- * branches is only meaningful measured on the same basis for every branch, and FR-022 asks for a
- * comparison, not a windowed metric. Contrast with `/branches/[branchId]`, a single-entity detail
- * view that DOES respect the time filter — see decision-log.md.
- */
 export default async function BranchesPage({
   searchParams,
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const resolvedSearchParams = await searchParams;
-  const urlParams = toURLSearchParams(resolvedSearchParams);
-  const dataset = getDataset();
-  const filters = parseFilters(urlParams, buildParseFiltersContext(dataset));
-  const ctx = buildContext(filters);
+  const { filters, ctx } = await resolvePage(searchParams);
 
-  const sparklines = new Map(computeBranchSparklines(ctx).map((s) => [s.branchId, s]));
+  const gates = computeBranchGates(ctx);
+  const reliability = new Map(
+    computePromiseReliabilityByBranch(ctx).map((r) => [r.branchId, r]),
+  );
 
-  const rows: BranchRow[] = dataset.branches.map((branch) => {
-    const leads = ctx.groupLeads.filter((l) => l.branchId === branch.id);
-    const deliveries = ctx.groupDeliveries.filter((d) => d.lead.branchId === branch.id);
+  const groupConversion = rate(
+    ctx.groupLeads.filter((l) => l.reachedStages.has("delivered")).length,
+    ctx.groupLeads.length,
+  );
+  const groupContact = rate(ctx.groupLeads.filter((l) => l.wasContacted).length, ctx.groupLeads.length);
+  const groupTd = rate(
+    ctx.groupLeads.filter((l) => l.tookTestDrive).length,
+    ctx.groupLeads.filter((l) => l.wasContacted).length,
+  );
+
+  interface Row {
+    branchId: string;
+    branchName: string;
+    city: string;
+    leads: number;
+    contactRatePct: number | null;
+    testDriveRatePct: number | null;
+    conversionPct: number | null;
+    delivered: number;
+    revenueRupees: number;
+    revenuePerLeadRupees: number | null;
+    targetUnits: number;
+    attainmentPct: number | null;
+    latePct: number | null;
+    stuck: number;
+    sparkline: number[];
+  }
+
+  const rows: Row[] = gates.map((g) => {
+    const branch = ctx.dataset.branchById.get(g.branchId);
+    const leads = ctx.dataset.leadsByBranch.get(g.branchId) ?? [];
     const delivered = leads.filter((l) => l.reachedStages.has("delivered"));
-    const open = leads.filter((l) => l.isOpen);
-
-    const targetTotal = dataset.months.reduce((sum, month) => {
-      const target = dataset.targetsByBranchMonth.get(`${branch.id}:${month}`);
-      return sum + (target?.target_units ?? 0);
-    }, 0);
-
+    const revenue = delivered.reduce((s, l) => s + l.dealValue, 0);
+    const targetUnits = ctx.dataset.months.reduce(
+      (s, m) => s + (ctx.dataset.targetsByBranchMonth.get(`${g.branchId}:${m}`)?.target_units ?? 0),
+      0,
+    );
     return {
-      branchId: branch.id,
-      branchLabel: branch.label,
-      href: buildHref(`/branches/${branch.id}`, filters),
-      deliveredUnits: deliveries.length,
-      deliveredRevenue: deliveries.reduce((sum, d) => sum + d.lead.dealValue, 0),
-      conversionPct: leads.length > 0 ? (delivered.length / leads.length) * 100 : null,
-      attainmentPct: targetTotal > 0 ? (deliveries.length / targetTotal) * 100 : null,
-      openPipelineValueRupees: open.reduce((sum, l) => sum + l.dealValue, 0),
-      sparklinePoints:
-        sparklines.get(branch.id)?.points.map((p) => p.deliveredUnits) ?? [],
+      branchId: g.branchId,
+      branchName: g.branchName,
+      city: branch?.city ?? "",
+      leads: g.leads,
+      contactRatePct: g.contactRatePct,
+      testDriveRatePct: g.testDriveRatePct,
+      conversionPct: g.conversionPct,
+      delivered: delivered.length,
+      revenueRupees: revenue,
+      revenuePerLeadRupees: leads.length === 0 ? null : revenue / leads.length,
+      targetUnits,
+      attainmentPct: rate(delivered.length, targetUnits),
+      latePct: reliability.get(g.branchId)?.latePct ?? null,
+      stuck: leads.filter((l) => l.isStuckOrder).length,
+      sparkline: ctx.dataset.months.map(
+        (m) =>
+          ctx.groupDeliveries.filter(
+            (d) => d.deliveryMonth === m && d.lead.branchId === g.branchId,
+          ).length,
+      ),
     };
   });
 
-  rows.sort((a, b) => b.deliveredUnits - a.deliveredUnits);
+  const ranked = rankBy(rows, (r) => r.revenuePerLeadRupees, (r) => r.branchId);
+  const rankOf = new Map(ranked.map((r) => [r.row.branchId, r.rank]));
+  const ordered = ranked.map((r) => r.row);
 
-  const columns: Column<BranchRow>[] = [
+  const top = ordered[0];
+  const bottom = ordered[ordered.length - 1];
+  const maxRevenue = Math.max(...rows.map((r) => r.revenueRupees), 1);
+  const maxRevPerLead = Math.max(...rows.map((r) => r.revenuePerLeadRupees ?? 0), 1);
+
+  // Highest-revenue branch is not necessarily the most reliable one — worth surfacing explicitly.
+  const byRevenue = [...rows].sort((a, b) => b.revenueRupees - a.revenueRupees)[0];
+  const leastReliable = [...rows]
+    .filter((r) => r.latePct !== null)
+    .sort((a, b) => (b.latePct as number) - (a.latePct as number))[0];
+
+  const columns: Column<Row>[] = [
     {
       header: "Branch",
       accessor: (r) => (
-        <Link
-          href={r.href}
-          className="font-medium text-ink-primary hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-        >
-          {r.branchLabel}
-        </Link>
+        <span className="flex items-center gap-2">
+          <RankBadge rank={rankOf.get(r.branchId) ?? 0} total={rows.length} />
+          <span className="block">
+            {r.branchName.replace(" Toyota", "")}
+            <span className="block text-[10px] font-normal text-ink-muted">{r.city}</span>
+          </span>
+        </span>
       ),
     },
-    { header: "Delivered", align: "right", accessor: (r) => formatCount(r.deliveredUnits) },
-    { header: "Revenue", align: "right", accessor: (r) => formatCurrency(r.deliveredRevenue) },
+    { header: "Leads", align: "right", accessor: (r) => formatCount(r.leads) },
+    {
+      header: "Contact",
+      align: "right",
+      hint: "of leads",
+      accessor: (r) => (
+        <span className="inline-flex items-center gap-1.5">
+          <StatusDot status={statusVsGroup(r.contactRatePct, groupContact, r.leads)} />
+          {r.contactRatePct === null ? "—" : formatPercent(r.contactRatePct)}
+        </span>
+      ),
+    },
+    {
+      header: "Test drive",
+      align: "right",
+      hint: "of contacted",
+      accessor: (r) => (
+        <span className="inline-flex items-center gap-1.5">
+          <StatusDot status={statusVsGroup(r.testDriveRatePct, groupTd, r.leads)} />
+          {r.testDriveRatePct === null ? "—" : formatPercent(r.testDriveRatePct)}
+        </span>
+      ),
+    },
     {
       header: "Conversion",
       align: "right",
-      accessor: (r) => (r.conversionPct !== null ? formatPercent(r.conversionPct) : "—"),
+      accessor: (r) => (
+        <span className="inline-flex items-center gap-1.5">
+          <StatusDot status={statusVsGroup(r.conversionPct, groupConversion, r.leads)} />
+          {r.conversionPct === null ? "—" : formatPercent(r.conversionPct)}
+        </span>
+      ),
     },
+    { header: "Units", align: "right", accessor: (r) => formatCount(r.delivered) },
     {
-      header: "Attainment",
+      header: "Revenue",
       align: "right",
-      accessor: (r) => (r.attainmentPct !== null ? formatPercent(r.attainmentPct) : "—"),
+      accessor: (r) => (
+        <span className="block">
+          {formatCurrency(r.revenueRupees)}
+          <MetricBar value={r.revenueRupees} max={maxRevenue} />
+        </span>
+      ),
     },
     {
-      header: "Open pipeline",
+      header: "Revenue / lead",
       align: "right",
-      accessor: (r) => formatCurrency(r.openPipelineValueRupees),
+      hint: "efficiency",
+      accessor: (r) => (
+        <span className="block">
+          {r.revenuePerLeadRupees === null ? "—" : formatCurrency(r.revenuePerLeadRupees)}
+          <MetricBar value={r.revenuePerLeadRupees} max={maxRevPerLead} />
+        </span>
+      ),
     },
     {
-      header: "Trend",
-      accessor: (r) => <Sparkline points={r.sparklinePoints} />,
+      header: "Late deliveries",
+      align: "right",
+      hint: "vs promised date",
+      accessor: (r) => (r.latePct === null ? "—" : formatPercent(r.latePct, 0)),
+    },
+    { header: "Stuck", align: "right", hint: "orders", accessor: (r) => formatCount(r.stuck) },
+    {
+      header: "Units trend",
+      align: "center",
+      accessor: (r) => <Sparkline label={`${r.branchName} monthly units`} points={r.sparkline} />,
     },
   ];
 
   return (
     <div className="animate-fade-in space-y-8">
-      <section aria-label="Branch comparison">
-        <h2 className="mb-3 text-lg font-semibold text-ink-primary">Branches</h2>
-        <p className="mb-4 text-sm text-ink-secondary">
-          All five branches on the same comparable metrics, ranked by units delivered.
-        </p>
-        <DataTable
-          columns={columns}
-          rows={rows}
-          rowKey={(r) => r.branchId}
-          caption="All branches compared on delivered units, revenue, conversion, attainment, open pipeline, and monthly delivery trend"
-        />
+      <SectionHeading
+        title="Branch benchmark"
+        as="h1"
+        hint="Full history for every branch, so the comparison is like-for-like regardless of the time filter. Ranked by revenue per lead — the efficiency figure that lead volume hides."
+      />
+
+      <section aria-label="Branch readings" className="grid gap-4 lg:grid-cols-3">
+        {top && bottom && (
+          <Callout
+            tone="critical"
+            label="The spread"
+            href={buildHref(`/branches/${bottom.branchId}`, filters)}
+            linkText={`Open ${bottom.branchName}`}
+          >
+            <Figure>{top.branchName}</Figure> turns every lead it receives into{" "}
+            <Figure>{formatCurrency(top.revenuePerLeadRupees ?? 0)}</Figure>.{" "}
+            <Figure>{bottom.branchName}</Figure> turns it into{" "}
+            <Figure>{formatCurrency(bottom.revenuePerLeadRupees ?? 0)}</Figure> — a{" "}
+            <Figure>
+              {(
+                (top.revenuePerLeadRupees ?? 1) / Math.max(bottom.revenuePerLeadRupees ?? 1, 1)
+              ).toFixed(1)}
+              ×
+            </Figure>{" "}
+            gap on the same product at broadly the same price.
+          </Callout>
+        )}
+
+        {byRevenue && leastReliable && (
+          <Callout tone="neutral" label="Revenue and reliability are not the same ranking">
+            {byRevenue.branchId === leastReliable.branchId ? (
+              <>
+                <Figure>{byRevenue.branchName}</Figure> is the group&apos;s biggest earner at{" "}
+                <Figure>{formatCurrency(byRevenue.revenueRupees)}</Figure> and also its least
+                reliable, missing its promised delivery date on{" "}
+                <Figure>{formatPercent(leastReliable.latePct ?? 0, 0)}</Figure> of sales. A units
+                dashboard would never show that.
+              </>
+            ) : (
+              <>
+                <Figure>{byRevenue.branchName}</Figure> earns the most (
+                {formatCurrency(byRevenue.revenueRupees)}), but{" "}
+                <Figure>{leastReliable.branchName}</Figure> misses its promised delivery date most
+                often, on <Figure>{formatPercent(leastReliable.latePct ?? 0, 0)}</Figure> of sales.
+              </>
+            )}
+          </Callout>
+        )}
+
+        <Callout tone="neutral" label="How to read the status marks">
+          Every ▲/▼ compares a branch to the <Figure>group&apos;s own</Figure> figure on that
+          metric, not to an external industry benchmark — the dataset supplies none, and inventing
+          one would make the judgement unfalsifiable. Branches under 15 leads get no mark at all.
+        </Callout>
+      </section>
+
+      <section aria-label="Branch comparison table">
+        <Card>
+          <SectionHeading title="All branches" hint="Click a branch for its own funnel, alerts, reps and model mix." />
+          <DataTable
+            columns={columns}
+            rows={ordered}
+            getRowKey={(r) => r.branchId}
+            rowHref={(r) => buildHref(`/branches/${r.branchId}`, filters)}
+            minWidth={1080}
+            caption="Branch benchmark across gates, revenue and reliability"
+          />
+        </Card>
+      </section>
+
+      <section aria-label="Branch charts" className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <SectionHeading title="Revenue by branch" hint="Total delivered revenue, full history." />
+          <RankedBar
+            rows={[...rows]
+              .sort((a, b) => b.revenueRupees - a.revenueRupees)
+              .map((r) => ({
+                key: r.branchId,
+                label: r.branchName.replace(" Toyota", ""),
+                value: r.revenueRupees,
+                display: formatCurrency(r.revenueRupees),
+                sublabel: `${formatCount(r.delivered)} units from ${formatCount(r.leads)} leads`,
+                href: buildHref(`/branches/${r.branchId}`, filters),
+              }))}
+          />
+        </Card>
+        <Card>
+          <SectionHeading
+            title="Value lost before a test drive"
+            hint="Leads that never reached a car — by branch, guaranteed zero."
+          />
+          <RankedBar
+            rows={[...gates]
+              .sort((a, b) => b.preTestDriveLostValueRupees - a.preTestDriveLostValueRupees)
+              .map((g) => ({
+                key: g.branchId,
+                label: g.branchName.replace(" Toyota", ""),
+                value: g.preTestDriveLostValueRupees,
+                display: formatCurrency(g.preTestDriveLostValueRupees),
+                sublabel: `contact ${g.contactRatePct === null ? "—" : formatPercent(g.contactRatePct, 0)} · test drive ${
+                  g.testDriveRatePct === null ? "—" : formatPercent(g.testDriveRatePct, 0)
+                }`,
+                href: buildHref("/leads", filters, undefined, {
+                  cohort: "never_contacted",
+                  branch: g.branchId,
+                }),
+              }))}
+          />
+        </Card>
       </section>
     </div>
   );

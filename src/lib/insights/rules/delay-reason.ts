@@ -3,7 +3,7 @@ import { buildHref } from "@/lib/filters/parse";
 import { formatPercent } from "@/lib/format";
 import type { Insight } from "../types";
 import { THRESHOLDS } from "../thresholds";
-import { groupByBranch } from "../helpers";
+import { groupByBranch, evidenceHref } from "../helpers";
 
 export const slug = "delay-reason" as const;
 
@@ -66,6 +66,8 @@ export function run(ctx: AnalyticsContext): Insight[] {
       },
       entity: { kind: "branch", id: branchId, label: branch.label },
       href: buildHref("/deliveries", ctx.filters, { branchId }),
+      evidenceHref: evidenceHref(ctx.filters, "delivered", { branch: branchId }),
+      action: "Take this one reason to the branch's operations lead — it dominates their delays.",
       evidence: topLeads.map((l) => l.id),
     });
   }

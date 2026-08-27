@@ -1,95 +1,166 @@
 "use client";
 
 import {
-  ResponsiveContainer,
-  LineChart,
+  Bar,
+  CartesianGrid,
+  ComposedChart,
   Line,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
 } from "recharts";
-import { getChartColors } from "@/lib/theme";
+import { chartColors } from "@/lib/theme";
 import { useTheme } from "@/components/theme/ThemeProvider";
-import { formatCount } from "@/lib/format";
+import { formatCurrency, formatCount } from "@/lib/format";
 
-export interface TrendChartPoint {
-  month: string;
-  deliveredUnits: number;
+export interface TrendPoint {
+  label: string;
+  revenueRupees: number;
+  units: number;
+  medianCycleDays: number | null;
+  targetUnits: number;
   leadsCreated: number;
 }
 
-function monthLabel(monthKey: string): string {
-  const parts = monthKey.split("-").map(Number);
-  const year = parts[0] ?? 2025;
-  const month = parts[1] ?? 1;
-  return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString("en-US", {
-    month: "short",
-    timeZone: "UTC",
-  });
-}
+export type TrendMetric = "revenue" | "units" | "cycle" | "leads";
 
-function TrendTooltip({
-  active,
-  payload,
-  label,
+/**
+ * Monthly trend, one measure at a time.
+ *
+ * The metric is a control rather than extra series on a second axis. Revenue (crore), units
+ * (count) and cycle time (days) have nothing in common numerically, and putting any two of them on
+ * one plot with two y-scales lets the reader "see" a relationship that the scales invented — the
+ * single most common way a dashboard chart lies. Switching is a URL change, so a particular view
+ * stays shareable.
+ *
+ * Units carries its monthly target as a reference line: same measure, same axis, so the comparison
+ * is legitimate. The targets are known to be unreliable and the caller labels them as such.
+ */
+export function TrendChart({
+  data,
+  metric,
+  showTarget = false,
 }: {
-  active?: boolean;
-  payload?: { value: number; name: string }[];
-  label?: string;
+  data: TrendPoint[];
+  metric: TrendMetric;
+  showTarget?: boolean;
 }) {
-  if (!active || !payload || payload.length === 0) return null;
-  return (
-    <div className="rounded-md border border-border bg-surface p-2 text-xs shadow-lg">
-      <div className="font-medium text-ink-primary">{label ? monthLabel(label) : ""}</div>
-      {payload.map((entry) => (
-        <div key={entry.name} className="tabular-nums text-ink-secondary">
-          {entry.name}: {formatCount(entry.value)}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/** Accepts a small pre-computed series — never a lead collection (Constitution I). */
-export function TrendChart({ data }: { data: TrendChartPoint[] }) {
   const { theme } = useTheme();
-  const c = getChartColors(theme === "dark");
+  const c = chartColors(theme === "dark");
+
+  const spec = {
+    revenue: {
+      key: "revenueRupees" as const,
+      name: "Delivered revenue",
+      kind: "bar" as const,
+      color: c.series[0] as string,
+      fmt: (v: number) => formatCurrency(v),
+      axisFmt: (v: number) => `₹${(v / 10_000_000).toFixed(1)}Cr`,
+    },
+    units: {
+      key: "units" as const,
+      name: "Units delivered",
+      kind: "bar" as const,
+      color: c.series[0] as string,
+      fmt: (v: number) => formatCount(v),
+      axisFmt: (v: number) => formatCount(v),
+    },
+    cycle: {
+      key: "medianCycleDays" as const,
+      name: "Median sales cycle",
+      kind: "line" as const,
+      color: c.series[1] as string,
+      fmt: (v: number) => `${v} days`,
+      axisFmt: (v: number) => `${v}d`,
+    },
+    leads: {
+      key: "leadsCreated" as const,
+      name: "Leads received",
+      kind: "bar" as const,
+      color: c.series[2] as string,
+      fmt: (v: number) => formatCount(v),
+      axisFmt: (v: number) => formatCount(v),
+    },
+  }[metric];
+
+  const maxTarget = Math.max(...data.map((d) => d.targetUnits), 0);
 
   return (
-    <div className="h-64 w-full" role="img" aria-label="Delivered units and leads created by month">
+    <div
+      style={{ width: "100%", height: 260 }}
+      role="img"
+      aria-label={`${spec.name} by month. ${data
+        .map((d) => `${d.label}: ${d[spec.key] === null ? "no data" : spec.fmt(d[spec.key] as number)}`)
+        .join("; ")}.`}
+    >
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
-          <CartesianGrid stroke={c.grid} vertical={false} />
+        <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: 4 }}>
+          <CartesianGrid stroke={c.grid} strokeDasharray="2 4" vertical={false} />
           <XAxis
-            dataKey="month"
-            tickFormatter={monthLabel}
-            stroke={c.mutedInk}
+            dataKey="label"
+            tick={{ fill: c.muted, fontSize: 11 }}
+            axisLine={{ stroke: c.baseline }}
             tickLine={false}
-            axisLine={{ stroke: c.grid }}
-            fontSize={12}
           />
-          <YAxis stroke={c.mutedInk} tickLine={false} axisLine={false} fontSize={12} width={32} />
-          <Tooltip content={<TrendTooltip />} />
-          <Line
-            type="monotone"
-            dataKey="deliveredUnits"
-            name="Delivered"
-            stroke={c.accent}
-            strokeWidth={2}
-            dot={{ r: 3, fill: c.accent }}
-            activeDot={{ r: 5 }}
+          <YAxis
+            tick={{ fill: c.muted, fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+            width={54}
+            tickFormatter={spec.axisFmt}
           />
-          <Line
-            type="monotone"
-            dataKey="leadsCreated"
-            name="Leads created"
-            stroke={c.mutedInk}
-            strokeWidth={2}
-            strokeDasharray="4 3"
-            dot={{ r: 3, fill: c.mutedInk }}
+          <Tooltip
+            cursor={{ fill: c.grid, fillOpacity: 0.35 }}
+            contentStyle={{
+              background: c.surface,
+              border: `1px solid ${c.grid}`,
+              borderRadius: 8,
+              fontSize: 12,
+              color: c.ink,
+            }}
+            labelStyle={{ color: c.ink, fontWeight: 600, marginBottom: 4 }}
+            formatter={(value: number | string) => [
+              value === null ? "No data" : spec.fmt(Number(value)),
+              spec.name,
+            ]}
           />
-        </LineChart>
+          {showTarget && metric === "units" && maxTarget > 0 && (
+            <Line
+              type="monotone"
+              dataKey="targetUnits"
+              stroke={c.muted}
+              strokeWidth={2}
+              strokeDasharray="4 4"
+              dot={false}
+              name="Monthly target"
+              isAnimationActive={false}
+            />
+          )}
+          {spec.kind === "bar" ? (
+            <Bar
+              dataKey={spec.key}
+              fill={spec.color}
+              radius={[4, 4, 0, 0]}
+              name={spec.name}
+              isAnimationActive={false}
+            />
+          ) : (
+            <Line
+              type="monotone"
+              dataKey={spec.key}
+              stroke={spec.color}
+              strokeWidth={2}
+              dot={{ r: 3, fill: spec.color, strokeWidth: 0 }}
+              activeDot={{ r: 5 }}
+              name={spec.name}
+              connectNulls
+              isAnimationActive={false}
+            />
+          )}
+          <ReferenceLine y={0} stroke={c.baseline} />
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
   );

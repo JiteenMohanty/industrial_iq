@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import type { LeadDetail } from "@/lib/analytics/leads";
 import { Sheet } from "@/components/ui/Sheet";
-import { Badge } from "@/components/ui/Badge";
+import { Pill } from "@/components/ui/Badge";
 import { formatCurrency, formatDate, formatDays } from "@/lib/format";
 
 function stageLabel(value: string): string {
@@ -67,7 +67,7 @@ export function LeadDetailSheet({
           </section>
 
           <section className="flex items-center gap-2">
-            <Badge>{lead.isOpen ? "Open" : stageLabel(lead.status)}</Badge>
+            <Pill>{lead.isOpen ? "Open" : stageLabel(lead.status)}</Pill>
             <span className="text-sm text-ink-secondary">
               Current stage: {stageLabel(lead.currentStage)}
             </span>

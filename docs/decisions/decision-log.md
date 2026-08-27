@@ -1444,3 +1444,113 @@ values, zero literal `undefined`/`NaN`/`Infinity` across `/`, `/funnel`, `/deliv
 either theme — the `claude-in-chrome` browser tool was unavailable in this environment (same
 limitation as the earlier T100/T101 responsive/accessibility pass). The user should give this a real
 look before considering it final, particularly the dark theme's contrast and the hover/lift feel.
+
+
+---
+
+# Feature 002 — Gate-First Rebuild (second submission)
+
+## 2026-08-26 · Phase 1 · T202 — Reframe the product around gates rather than stages
+
+**Decision**: Make the two pre-test-drive gates (contact, test drive) the primary frame of the
+product, demoting the six-stage funnel to a diagnostic on its own page.
+
+**Reasoning**: A second pass over the dataset established two facts v1 never surfaced. The funnel is
+strictly sequential — zero of 510 leads skip a stage — and the test drive is absolute: of the 391
+contacted leads, the 91 that never took one produced zero deliveries, not a reduced rate. That makes
+a lead stalled before the test drive a closed opportunity rather than a weak one, and it means 210
+leads carrying Rs 52.16 Cr were decided before any closing skill applied. A six-stage funnel where
+every step reads as a probabilistic conversion tells a materially different and less true story.
+
+**Alternatives considered**: (a) Keep the stage funnel primary and add a gate callout — rejected,
+because the callout would be describing the more important fact while the chart contradicted its
+framing. (b) Present gates as a fourth chart on the overview — rejected for the same reason; the
+frame has to lead or it is not the frame.
+
+## 2026-08-26 · Phase 3 · T234 — Separate insight ranking from headline selection
+
+**Decision**: Keep `runInsights()` as a strict total order (severity, impact, id) and add
+`selectHeadlines()`, which picks round-robin across rules for the landing feed.
+
+**Reasoning**: v1's feed sliced the top five off the total order. On this dataset that produced four
+cards from the same rule at four branches — strictly correct, and a poor summary of the business.
+Ranking and selection are different concerns: the CSV endpoint, branch pages and the FR-010
+determinism guarantee all need the strict order; the feed needs coverage.
+
+**Alternatives considered**: (a) Change the global sort to interleave rules — rejected, it would
+have broken the determinism contract and the CSV's meaning. (b) Cap each rule at one insight in the
+engine — rejected, branch pages and the CSV legitimately need every instance.
+
+## 2026-08-26 · Phase 3 · T230 — Two links per insight, plus a fixed action line
+
+**Decision**: Every `Insight` carries `href` (the entity) and `evidenceHref` (the records it
+counted), plus a rule-authored `action`. All three required, never optional.
+
+**Reasoning**: v1 satisfied "drillable" with a link to the branch an alert concerned, which never
+listed the alert's leads — the CSV was the only real path to the records. That is a dead end wearing
+a link, and it undercut the product's central claim. The constitution's Principle IV was rewritten
+around this and the `/leads` explorer built to receive the links.
+
+**Alternatives considered**: Adding a lead table to each branch page instead — rejected, it would
+duplicate the same table on five pages and still not serve rep-, model- or source-scoped alerts.
+
+## 2026-08-26 · Phase 4 · T242 — Server-render charts by default
+
+**Decision**: Build the gate funnel, stage funnel, ranked bars, distributions, sparklines and the
+interest heatmap as server-rendered HTML/CSS or inline SVG with native `title` tooltips. Keep
+Recharts only for `TrendChart` and `RepScatter`.
+
+**Reasoning**: v1 shipped the chart library on every route including ones with nothing interactive
+(~210 kB first load). Native tooltips and CSS hover give genuine interactivity at zero JS cost, and
+the components stay Server Components so no view-shaped data crosses the boundary. Seven of nine
+routes fell to ~106 kB. Recharts survives where a crosshair over a time series or a scatter tooltip
+is doing real work that HTML cannot.
+
+**Alternatives considered**: (a) Recharts everywhere for consistency — rejected on payload. (b) A
+lighter chart library — rejected as a dependency swap that would not have removed the JS at all.
+
+## 2026-08-26 · Phase 6 · T263/T264 — Measured verification found what code review had missed
+
+**Decision**: Verify responsive layout and accessibility by measuring the rendered pages, and
+convert contrast into a permanent test suite.
+
+**Reasoning**: v1 recorded both passes as "verified by structural code review". Measuring found a
+199px horizontal overflow at 768px on `/models` (CSS Grid `min-width: auto` letting a wide table
+size its track — fixed on the `Card` primitive) and three genuine WCAG failures: an active
+segmented-control tab at 3.64:1, a heatmap ramp step carrying white text at 3.64:1, and a "no data"
+placeholder at 3.26:1. One colour, `#2a78d6`, turned out to fail against *both* near-black (4.46:1)
+and white (4.48:1), so no ink choice could rescue it — the ramp step itself was removed. None of
+this was visible in the source. Principle VIII was added to the constitution as a result.
+
+**Alternatives considered**: Trusting the palette because it came from a validated reference set —
+rejected; the reference validates categorical separation, not the arbitrary text-on-fill pairs a
+product invents on top of it.
+
+## 2026-08-26 · Phase 6 · T261 — Fixtures must come from the shipped code path
+
+**Decision**: Derive every v2 fixture by running the shipped analytics functions, and correct two
+that had been derived otherwise.
+
+**Reasoning**: A currency fixture transcribed from a formatted "Rs 28.61 Cr" label was 20,000 rupees
+off the true 286,080,000, because the label rounds to two decimals. A promise-reliability count
+computed with raw millisecond arithmetic disagreed with the product's UTC date flooring by one lead
+— a car handed over at 14:00 on its promised day. The shipped code is right in both cases: the
+promise was a date, not an instant. Principle V now requires this explicitly.
+
+**Alternatives considered**: Loosening the assertions to `toBeCloseTo` — rejected, that hides the
+disagreement rather than resolving it, and the disagreement was the useful signal.
+
+## 2026-08-26 · Phase 4 · T241 — Sequential ramp lives in `:root`, not `@theme`
+
+**Decision**: Declare `--color-seq-0..7` and `--color-seq-ink-0..7` in a plain `:root`/`.dark` pair
+rather than inside Tailwind's `@theme` block, and drive the heatmap from them instead of from a JS
+theme flag.
+
+**Reasoning**: Two bugs, one fix. Resolving the ramp from `useTheme()` made cell colour depend on
+client state that changes after hydration, which put light-ramp and dark-ramp cells on screen
+simultaneously. Moving to CSS variables fixed that and let the component become a Server Component —
+but under `@theme` the variables vanished, because Tailwind v4 tree-shakes theme variables no
+generated utility references, and these are consumed only from an inline `style` attribute.
+
+**Alternatives considered**: Emitting utility classes for all sixteen values so `@theme` would keep
+them — rejected as sixteen single-use classes existing only to defeat tree-shaking.

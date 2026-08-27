@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeChannelPerformance } from "@/lib/analytics/channels";
+import { computeChannelPerformance } from "@/lib/analytics/sources";
 import { getDataset } from "@/lib/data/dataset";
 import { buildContext } from "@/lib/analytics/context";
 import { parseFilters, buildParseFiltersContext } from "@/lib/filters/parse";

@@ -2,7 +2,7 @@ import type { AnalyticsContext } from "@/lib/analytics/context";
 import { buildHref } from "@/lib/filters/parse";
 import type { Insight } from "../types";
 import { THRESHOLDS } from "../thresholds";
-import { sumDealValue, groupByBranch } from "../helpers";
+import { sumDealValue, groupByBranch, evidenceHref } from "../helpers";
 
 export const slug = "never-contacted" as const;
 
@@ -42,6 +42,8 @@ export function run(ctx: AnalyticsContext): Insight[] {
       },
       entity: { kind: "branch", id: branchId, label: branch.label },
       href: buildHref(`/branches/${branchId}`, ctx.filters),
+      evidenceHref: evidenceHref(ctx.filters, "never_contacted", { branch: branchId }),
+      action: "Assign these leads to a rep today and call them — every one is currently worth zero.",
       evidence: leads.map((l) => l.id),
     });
   }

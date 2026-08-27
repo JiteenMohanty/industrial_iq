@@ -14,6 +14,7 @@ import type {
   Rep,
   Dataset,
   Stage,
+  Source,
 } from "./types";
 import { FUNNEL_STAGES } from "./types";
 import { computeDataAsOf, daysBetween, toMonthKey } from "@/lib/time";
@@ -165,6 +166,12 @@ function buildDataset(): Dataset {
     const isStuckOrder = reachedStages.has("order_placed") && !hasDeliveryRecord && !isLost;
     const orderPlacedAt = stageTimestamps.order_placed ?? null;
 
+    // The test drive is an absolute gate in this dataset: of 391 contacted leads, the 91 that
+    // never took a test drive produced zero deliveries. Surfaced as a first-class field because
+    // it drives the product's central diagnosis, not as an incidental stage lookup.
+    const deliveredAt = stageTimestamps.delivered ?? null;
+    const expectedCloseAt = new Date(raw.expected_close_date);
+
     return {
       id: raw.id,
       customerName: raw.customer_name,
@@ -194,6 +201,11 @@ function buildDataset(): Dataset {
       ageDays: daysBetween(createdAt, dataAsOf),
       daysSinceActivity: daysBetween(lastActivityAt, dataAsOf),
       daysSinceOrder: orderPlacedAt ? daysBetween(orderPlacedAt, dataAsOf) : null,
+      wasContacted: reachedStages.has("contacted"),
+      tookTestDrive: reachedStages.has("test_drive"),
+      cycleDays: deliveredAt ? daysBetween(createdAt, deliveredAt) : null,
+      expectedCloseAt,
+      closeSlipDays: deliveredAt ? daysBetween(expectedCloseAt, deliveredAt) : null,
       delivery: null,
       branch,
       rep,
@@ -232,6 +244,8 @@ function buildDataset(): Dataset {
 
   const leadsByBranch = new Map<string, EnrichedLead[]>();
   const leadsByRep = new Map<string, EnrichedLead[]>();
+  const leadsByModel = new Map<string, EnrichedLead[]>();
+  const leadsBySource = new Map<Source, EnrichedLead[]>();
   for (const lead of leads) {
     const branchList = leadsByBranch.get(lead.branchId) ?? [];
     branchList.push(lead);
@@ -240,7 +254,24 @@ function buildDataset(): Dataset {
     const repList = leadsByRep.get(lead.assignedTo) ?? [];
     repList.push(lead);
     leadsByRep.set(lead.assignedTo, repList);
+
+    const modelList = leadsByModel.get(lead.modelInterested) ?? [];
+    modelList.push(lead);
+    leadsByModel.set(lead.modelInterested, modelList);
+
+    const sourceList = leadsBySource.get(lead.source) ?? [];
+    sourceList.push(lead);
+    leadsBySource.set(lead.source, sourceList);
   }
+
+  // Ordered by descending lead volume so every model/source axis in the product renders in the
+  // same, stable order without each call site re-sorting.
+  const models = [...leadsByModel.entries()]
+    .sort((a, b) => b[1].length - a[1].length)
+    .map(([m]) => m);
+  const sources = [...leadsBySource.entries()]
+    .sort((a, b) => b[1].length - a[1].length)
+    .map(([sc]) => sc);
 
   const targetsByBranchMonth = new Map(
     rawData.targets.map((t) => [`${t.branch_id}:${t.month}`, t]),
@@ -254,6 +285,8 @@ function buildDataset(): Dataset {
   Object.freeze(branches);
   Object.freeze(reps);
   Object.freeze(months);
+  Object.freeze(models);
+  Object.freeze(sources);
 
   return {
     leads,
@@ -264,9 +297,13 @@ function buildDataset(): Dataset {
     dataAsOf,
     minCreatedAt,
     months,
+    models,
+    sources,
     leadById,
     leadsByBranch,
     leadsByRep,
+    leadsByModel,
+    leadsBySource,
     deliveryByLeadId,
     targetsByBranchMonth,
     repById,

@@ -30,14 +30,26 @@ const THEME_INIT_SCRIPT = `
 
 export const metadata: Metadata = {
   title: "DealerPulse",
-  description: "Dealership performance dashboard",
+  description:
+    "Where a five-branch dealership group is winning, losing, and leaking — and what to do about it.",
 };
 
+/**
+ * Navigation follows the reader's mental model rather than the data model: position first, then
+ * the diagnostic layer (where it breaks, what customers want, where leads come from), then the
+ * entities accountable for it, then the raw records. Nothing is nested — every section is one
+ * click from every other, because a manager chasing a problem should never have to remember which
+ * parent a view lives under.
+ */
 const NAV_LINKS = [
   { href: "/", label: "Overview" },
   { href: "/funnel", label: "Funnel" },
-  { href: "/deliveries", label: "Deliveries" },
+  { href: "/models", label: "Demand" },
+  { href: "/sources", label: "Sources" },
   { href: "/branches", label: "Branches" },
+  { href: "/reps", label: "Reps" },
+  { href: "/deliveries", label: "Deliveries" },
+  { href: "/leads", label: "Leads" },
 ] as const;
 
 function FreshnessBanner() {
@@ -60,13 +72,13 @@ function SiteNav() {
       <div className="relative mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
         <Link
           href="/"
-          className="bg-gradient-to-r from-accent to-accent-hover bg-clip-text font-semibold text-transparent"
+          className="font-semibold tracking-tight text-ink-primary"
         >
           DealerPulse
         </Link>
 
         <div className="flex items-center gap-4">
-          <ul className="hidden items-center gap-6 lg:flex">
+          <ul className="hidden items-center gap-5 lg:flex">
             {NAV_LINKS.map((link) => (
               <li key={link.href}>
                 <Link
@@ -164,7 +176,7 @@ export default function RootLayout({
         <ThemeProvider>
           <a
             href="#main-content"
-            className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-accent focus:px-3 focus:py-2 focus:text-white"
+            className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-accent-solid focus:px-3 focus:py-2 focus:text-white"
           >
             Skip to content
           </a>

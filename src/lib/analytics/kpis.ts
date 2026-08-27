@@ -1,6 +1,7 @@
 import type { AnalyticsContext } from "./context";
 import type { TimePreset } from "@/lib/filters/types";
 import { formatCount } from "@/lib/format";
+import { median } from "./benchmark";
 
 export type DeltaDirection = "up" | "down" | "flat";
 
@@ -14,6 +15,8 @@ export type KpiKey =
   | "deliveredUnits"
   | "deliveredRevenue"
   | "conversionRate"
+  | "testDriveRate"
+  | "avgCycleDays"
   | "openPipelineValue"
   | "attainment";
 
@@ -21,7 +24,7 @@ export interface Kpi {
   key: KpiKey;
   /** null when the metric is genuinely undefined (e.g. a rate over zero leads) — never NaN/0-as-fact. */
   value: number | null;
-  unit: "count" | "rupees" | "pct";
+  unit: "count" | "rupees" | "pct" | "days";
   delta: Delta | null;
   caveat?: string;
 }
@@ -30,6 +33,21 @@ export interface KpiSet {
   deliveredUnits: Kpi;
   deliveredRevenue: Kpi;
   conversionRate: Kpi;
+  /**
+   * Test drives as a share of contacted leads. Promoted to a headline metric in v2 because it is
+   * the single strongest predictor of revenue in this dataset — no lead has ever been delivered
+   * without one — and it is the earliest number a manager can still act on.
+   */
+  testDriveRate: Kpi;
+  /**
+   * Median days from lead creation to delivery, for units delivered in the window.
+   *
+   * Named "sales cycle", deliberately not "average days to sell": ADS in the classic sense is
+   * days-in-inventory divided by units sold, and this dataset carries no inventory or stock
+   * records at all, so that figure cannot be computed. This is the closest honest analogue and is
+   * labelled as what it actually measures. See DECISIONS.md.
+   */
+  avgCycleDays: Kpi;
   openPipelineValue: Kpi;
   attainment: Kpi;
 }
@@ -83,6 +101,14 @@ function conversionRatePct(leads: { reachedStages: ReadonlySet<string> }[]): num
   return (delivered / leads.length) * 100;
 }
 
+function testDriveRatePct(
+  leads: { wasContacted: boolean; tookTestDrive: boolean }[],
+): number | null {
+  const contacted = leads.filter((l) => l.wasContacted);
+  if (contacted.length === 0) return null;
+  return (contacted.filter((l) => l.tookTestDrive).length / contacted.length) * 100;
+}
+
 /**
  * Attainment excludes branch-months with no target row from the denominator entirely — a missing
  * target is never coerced to zero (spec edge case: Missing targets). Returns null (not 0/NaN) when
@@ -119,6 +145,19 @@ export function computeKpis(ctx: AnalyticsContext): KpiSet {
   const convPct = conversionRatePct(ctx.leads);
   const priorConvPct = conversionRatePct(ctx.priorLeads);
 
+  const tdPct = testDriveRatePct(ctx.leads);
+  const priorTdPct = testDriveRatePct(ctx.priorLeads);
+
+  // Cycle time is a property of units *delivered* in the window, so it follows the delivery-date
+  // scope rather than the lead-creation scope (FR-030). Median rather than mean: the distribution
+  // has a long right arm and a mean overstates the typical journey.
+  const cycleDays = median(
+    ctx.deliveries.map((d) => d.lead.cycleDays).filter((v): v is number => v !== null),
+  );
+  const priorCycleDays = median(
+    ctx.priorDeliveries.map((d) => d.lead.cycleDays).filter((v): v is number => v !== null),
+  );
+
   // Detection-scoped, not window-scoped: open pipeline is a present-tense fact about leads
   // currently in flight, not a property of a historical time window (contracts/analytics-api.md).
   const openPipelineValue = ctx.detectionLeads
@@ -145,6 +184,20 @@ export function computeKpis(ctx: AnalyticsContext): KpiSet {
       value: convPct,
       unit: "pct",
       delta: buildDelta(convPct, priorConvPct, ctx.hasPriorPeriod, basis),
+    },
+    testDriveRate: {
+      key: "testDriveRate",
+      value: tdPct,
+      unit: "pct",
+      delta: buildDelta(tdPct, priorTdPct, ctx.hasPriorPeriod, basis),
+    },
+    avgCycleDays: {
+      key: "avgCycleDays",
+      value: cycleDays,
+      unit: "days",
+      // Falling is better here, so the tile inverts the usual good/bad colouring — handled in the
+      // component via `lowerIsBetter`, not by flipping the sign of the number itself.
+      delta: buildDelta(cycleDays, priorCycleDays, ctx.hasPriorPeriod, basis),
     },
     openPipelineValue: {
       key: "openPipelineValue",

@@ -1,6 +1,36 @@
 <!--
 Sync Impact Report
 ==================
+Version change: 1.0.1 -> 2.0.0
+Bump rationale: MAJOR. Two principles are redefined in ways that are not backward compatible with
+v1's implementation, and one is added. Driven by the second-submission rebuild (feature 002), whose
+exploratory analysis established a structural fact about this dataset that v1's framing missed:
+the funnel is strictly sequential and the test drive is an absolute gate - of 391 contacted leads,
+the 91 that never took a test drive produced zero deliveries. A dashboard that treats mid-funnel
+stages as probabilistic steps is telling a different story than the data supports.
+
+Principles modified:
+  - IV. Every Insight Is Actionable and Drillable -> Every Insight Reaches Its Own Evidence.
+    REDEFINED. v1 satisfied "drillable" with a link to the entity an alert was about; the alert's
+    actual evidence set was reachable only as a CSV download. Now every alert MUST link to the
+    records themselves, in-product.
+  - V. Analytics Are Tested Against Real Dataset Fixtures - REDEFINED (expanded). Fixtures must now
+    be derived from the shipped code path, never transcribed from an analysis script or a formatted
+    display string. Two v2 fixtures were wrong on exactly those grounds before this rule existed.
+
+Principles added:
+  - VIII. Verified By Measurement, Not By Code Review (NON-NEGOTIABLE)
+
+Sections modified:
+  - Technology & Structure Constraints - folder layout updated for the rebuilt route set.
+  - Development Workflow & Quality Gates - gates 6 and 7 now require measured evidence.
+
+Deferred items / TODOs: none.
+-->
+
+<!--
+Sync Impact Report
+==================
 Version change: 1.0.0 → 1.0.1
 Bump rationale: PATCH. Factual correction to a pinned test fixture in Principle V, discovered
 during /speckit-plan by recomputing every §2 figure directly against docs/dealership_data.json.
@@ -102,14 +132,23 @@ shippable.
 **Rationale**: The product's credibility is the deliverable. One invented number invalidates the
 rest of the dashboard.
 
-### IV. Every Insight Is Actionable and Drillable
+### IV. Every Insight Reaches Its Own Evidence (NON-NEGOTIABLE)
 
 Every insight, alert, and KPI tile MUST link through to the underlying records with the active
 filter state preserved. An alert that cannot be drilled into MUST NOT ship. The drill-down floor
 is the lead detail sheet showing the full `status_history` timeline.
 
-**Rationale**: The brief is "understand performance **and act on it**". A read-only alert is a
-dead end.
+**"Drillable" means the records, not the entity.** An alert that counts 33 specific leads MUST link
+to a view listing those 33 leads. Linking to the branch those leads belong to does NOT satisfy this
+principle. Every rule therefore carries two links - `href` to the entity it concerns, and
+`evidenceHref` to the exact record set it counted - plus a fixed, rule-authored `action` line
+naming what to do about it. The evidence view MUST share its scope with the detection rules
+(branch-scoped, never time-scoped), so a list opened from an alert can never contain fewer records
+than the alert just claimed.
+
+**Rationale**: The brief is "understand performance **and act on it**". v1 shipped alerts whose
+"view evidence" link landed on a summary page that never listed the records in question, leaving a
+CSV download as the only real path to them. That is a dead end wearing a link.
 
 ### V. Analytics Are Tested Against Real Dataset Fixtures (NON-NEGOTIABLE)
 
@@ -126,7 +165,16 @@ These tests are both regression protection and the proof that the analytics are 
 that moves one of these numbers MUST be explained in the decision log before the fixture is
 updated. Pure functions are tested directly; no DOM tests are required for the analytics layer.
 
-**Rationale**: The insights are only worth as much as the arithmetic underneath them.
+**Fixtures MUST be derived from the shipped code path.** A figure transcribed from an exploratory
+analysis script, from a planning document, or from a formatted display string is not a fixture - it
+is a second implementation that happens to disagree. Two v2 fixtures were wrong on exactly these
+grounds before this rule existed: a currency total read back from a formatted crore label lost
+rupees to rounding, and a promise-reliability count computed with raw millisecond arithmetic
+disagreed with the product's own UTC date flooring by one lead. In both cases the shipped code was
+right and the fixture moved to match it.
+
+**Rationale**: The insights are only worth as much as the arithmetic underneath them - and a test
+that asserts a number the product does not actually compute proves nothing.
 
 ### VI. URL Is the Only Filter State
 
@@ -155,6 +203,23 @@ modules is FORBIDDEN.
 **Rationale**: One constant to flip when the dataset is refreshed, and one place where the money
 is formatted correctly.
 
+### VIII. Verified By Measurement, Not By Code Review (NON-NEGOTIABLE)
+
+Claims about rendered behaviour - responsive layout, colour contrast, accessible naming, the
+absence of `NaN`/`undefined` in output - MUST be verified by measuring the rendered result. Reading
+the source and concluding that it looks correct is NOT verification and MUST NOT be recorded as
+such.
+
+Where a property can be asserted arithmetically it MUST become a test rather than a one-off check:
+contrast ratios are computed from the design tokens in `tests/design/contrast.spec.ts`, so a
+palette edit that breaks the floor fails the suite instead of shipping.
+
+**Rationale**: v1 recorded its responsive and accessibility passes as "verified by structural code
+review". Measuring the same pages found a 199px horizontal overflow at 768px and three genuine
+contrast failures - including one colour that fails against both black and white text and therefore
+could not be fixed by any choice of ink. Every one of those was invisible to a careful reading of
+the source.
+
 ## Technology & Structure Constraints
 
 **Locked stack (non-negotiable — changing any entry requires an ADR):**
@@ -179,14 +244,17 @@ docs/decisions/           decision-log.md · architecture-decisions.md
 src/
   data/                   dealership_data.json (copy; docs/ original stays untouched)
   app/                    routes; layout.tsx · page.tsx · loading.tsx per route
+                          / · funnel · models · sources · branches[/id] · reps[/id]
+                          deliveries · leads · api/call-list
   lib/
-    time.ts · format.ts
+    time.ts · format.ts · theme.ts
     data/                 types.ts · dataset.ts
-    filters/              searchParams ⇄ typed Filters, applyFilters()
-    analytics/            kpis · funnel · targets · pipeline · reps · trends
-    insights/             types · rules · engine
+    filters/              searchParams ⇄ typed Filters, applyFilters(), page-context.ts
+    analytics/            gates · kpis · funnel · models · sources · pipeline · deliveries
+                          reps · trends · leads · benchmark
+    insights/             types · thresholds · rules (11) · engine
   components/
-    ui/ · charts/ · filters/ · insights/ · leads/
+    ui/ · charts/ · filters/ · insights/ · leads/ · theme/
 ```
 
 **Naming conventions:**
@@ -269,8 +337,11 @@ pass.
 5. Every route walked in `npm run dev`: Action Center click-through lands on the correct
    branch/rep/lead with filters preserved; time-range changes recompute all views and update the
    URL; a zero-result range renders an empty state rather than crashing.
-6. Responsive pass at 1440px, 1024px, and 768px with no horizontal page scroll.
-7. Accessibility pass: labels, contrast, keyboard navigation.
+6. Responsive pass at 1440px, 1024px, and 768px, verified by **measuring**
+   `document.documentElement.scrollWidth - clientWidth` on every route. Zero, or it is not done.
+7. Accessibility pass: every interactive element carries an accessible name, headings do not skip
+   levels, and every text/background token pair clears its WCAG floor - the last asserted by
+   `tests/design/contrast.spec.ts`, not by inspection.
 8. Storytelling acceptance test: the Lakeside Toyota story is discoverable in under 30 seconds
    from a cold open.
 
@@ -304,4 +375,4 @@ a decision-log entry; they require a superseding ADR and a MAJOR amendment here.
 **Runtime guidance**: `plan.md` is the working build document — scope, architecture, and phase
 progress. This constitution governs how that plan is executed.
 
-**Version**: 1.0.1 | **Ratified**: 2026-08-24 | **Last Amended**: 2026-08-24
+**Version**: 2.0.0 | **Ratified**: 2026-08-24 | **Last Amended**: 2026-08-26

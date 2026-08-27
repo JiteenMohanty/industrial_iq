@@ -104,6 +104,12 @@ export function buildHref(
   pathname: string,
   filters: Filters,
   overrides?: Partial<Filters>,
+  /**
+   * Non-filter query parameters (cohort, model, sort, overlay, ...). Carried here rather than
+   * concatenated onto the returned string by each call site, so every internal link is built in
+   * exactly one place and `?`/`&` joining can never be got wrong. Undefined values are omitted.
+   */
+  extraParams?: Record<string, string | undefined>,
 ): string {
   const merged: Filters = { ...filters, ...overrides };
   const params = new URLSearchParams();
@@ -120,6 +126,10 @@ export function buildHref(
   }
   if (merged.branchId) {
     params.set("branch", merged.branchId);
+  }
+
+  for (const [key, value] of Object.entries(extraParams ?? {})) {
+    if (value !== undefined && value !== "") params.set(key, value);
   }
 
   const query = params.toString();

@@ -9,7 +9,9 @@ export type InsightRuleSlug =
   | "rep-outlier"
   | "lost-reason"
   | "channel-quality"
-  | "delay-reason";
+  | "delay-reason"
+  | "test-drive-gate"
+  | "promise-reliability";
 
 export type MetricUnit = "pct" | "days" | "rupees" | "count";
 
@@ -19,7 +21,7 @@ export interface InsightMetric {
   unit: MetricUnit;
 }
 
-export type InsightEntityKind = "branch" | "rep" | "channel" | "group";
+export type InsightEntityKind = "branch" | "rep" | "channel" | "model" | "group";
 
 export interface InsightEntity {
   kind: InsightEntityKind;
@@ -44,4 +46,16 @@ export interface Insight {
   entity: InsightEntity;
   href: string;
   evidence: string[];
+  /**
+   * Where the reader goes to see the specific records behind this alert, as opposed to `href`,
+   * which goes to the entity the alert is *about* (a branch, a rep). v1 only had `href`, so
+   * "view evidence" landed on a branch summary that never listed the leads in question; the
+   * evidence link closes that gap (FR-008, SC-002).
+   */
+  evidenceHref: string;
+  /**
+   * One short imperative sentence naming what to actually do. Rule-authored and fixed — this is
+   * not a generated recommendation, and it never contains a figure the rule did not compute.
+   */
+  action: string;
 }

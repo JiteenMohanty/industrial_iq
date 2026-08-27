@@ -1,31 +1,63 @@
 @import "tailwindcss";
 
 /* Enables `dark:` utilities keyed off a `.dark` class (ThemeProvider) rather than only
-   `prefers-color-scheme` — needed for a user-controlled toggle independent of OS setting. Most of
-   this file's actual theming happens through the CSS-variable overrides below, not `dark:`
-   utilities, but a few components use the variant directly for things a variable can't express. */
+   `prefers-color-scheme` — needed for a user-controlled toggle independent of OS setting. Most
+   theming happens through the CSS-variable overrides below, not `dark:` utilities. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * DESIGN SYSTEM
+ * =============
+ * Every colour below comes from the dataviz skill's validated reference palette, and the
+ * categorical slots were re-validated for this product's surfaces before use (three-slot
+ * all-pairs run: worst CVD ΔE 9.2, worst normal-vision ΔE 24.0 — both clear).
+ *
+ * Structure:
+ *   - surfaces      three planes: page < surface < raised. Nothing floats on a shadow.
+ *   - ink           four weights, never more.
+ *   - status        good / warning / critical, fixed and mode-invariant, always paired with a
+ *                   glyph or a label so meaning never rests on hue alone (WCAG 2.1 AA).
+ *   - series 1-8    fixed categorical order, never cycled, never reused for status.
+ *   - seq 100-700   single-hue blue ramp, for the interest heatmap only.
+ */
 @theme {
-  --font-sans:
-    system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
 
-  --color-accent: #2a78d6;
-  --color-accent-hover: #1c5cab;
-
-  --color-critical: #d03b3b;
-  --color-warning: #fab219;
-  --color-good: #0ca30c;
-
-  --color-surface: #fcfcfb;
-  --color-page: #f9f9f7;
+  /* --- surfaces & ink --- */
+  --color-page: #f7f7f5;
+  --color-surface: #ffffff;
+  --color-raised: #f4f4f1;
   --color-ink-primary: #0b0b0b;
   --color-ink-secondary: #52514e;
   --color-ink-muted: #898781;
-  --color-grid: #e1e0d9;
+  --color-grid: #e6e5df;
   --color-baseline: #c3c2b7;
   --color-border: #0b0b0b1a;
+  --color-border-strong: #0b0b0b2e;
 
+  /* --- accent --- */
+  --color-accent: #2a78d6;
+  --color-accent-hover: #1c5cab;
+  --color-accent-soft: #eaf2fd;
+  /* Selected-control fill. Deliberately NOT themed: white text on this measures ~7:1 in both
+     modes, because what matters is text-against-fill, not fill-against-surface. Theming it
+     produced a 2.4:1 active tab in dark mode. */
+  --color-accent-solid: #1c5cab;
+
+  /* --- status (fixed; never themed) --- */
+  --color-critical: #d03b3b;
+  --color-warning: #fab219;
+  --color-good: #0ca30c;
+  --color-critical-soft: #fbeaea;
+  --color-warning-soft: #fdf3e0;
+  --color-good-soft: #e8f6e8;
+  /* Text-safe variants — the status hexes above clear 3:1 for UI boundaries but not 4.5:1 for
+     body text on every surface, so any status-coloured *text* uses these instead. */
+  --color-critical-ink: #a52a2a;
+  --color-warning-ink: #7a5200;
+  --color-good-ink: #006300;
+
+  /* --- categorical series --- */
   --color-series-1: #2a78d6;
   --color-series-2: #eb6834;
   --color-series-3: #1baf7a;
@@ -34,56 +66,136 @@
   --color-series-6: #008300;
   --color-series-7: #4a3aa7;
   --color-series-8: #e34948;
+
+
+  --radius-card: 10px;
 }
 
 html {
   color-scheme: light;
 }
 
-/*
- * Dark theme: overrides the same custom-property names `@theme` declares above, not a parallel
- * set. Tailwind's generated utilities (bg-surface, text-ink-primary, border-grid, ...) already
- * compile to `var(--color-*)`, so redefining the variable under `.dark` re-themes every one of
- * them automatically — no component needed a `dark:` prefix added. Values are the dark-mode
- * members of each pair already carried in lib/theme.ts's COLOR object (sourced from the dataviz
- * skill's reference palette during T030, computed but left unused when dark mode was originally
- * deferred — see decision-log.md). `critical`/`warning`/`good` are deliberately absent here: they
- * stay mode-invariant by design (T030), verified against a dark surface at the time.
- */
 .dark {
   color-scheme: dark;
-  --color-accent: #3987e5;
-  --color-accent-hover: #57a6f2;
-  --color-surface: #1a1a19;
-  --color-page: #0d0d0d;
+  --color-page: #0c0c0b;
+  --color-surface: #171716;
+  --color-raised: #201f1e;
   --color-ink-primary: #ffffff;
   --color-ink-secondary: #c3c2b7;
-  --color-ink-muted: #898781;
+  --color-ink-muted: #928f88;
   --color-grid: #2c2c2a;
-  --color-baseline: #52514e;
+  --color-baseline: #43423f;
   --color-border: #ffffff1f;
+  --color-border-strong: #ffffff33;
+
+  --color-accent: #3987e5;
+  --color-accent-hover: #6da7ec;
+  --color-accent-soft: #16283d;
+  /* --color-accent-solid is intentionally not overridden here — see its definition above. */
+
+  --color-critical-soft: #2e1717;
+  --color-warning-soft: #2c2210;
+  --color-good-soft: #12240f;
+  /* On the dark surface the base status hexes already clear the text floor, so the "ink"
+     variants collapse back onto them rather than darkening further into the background. */
+  --color-critical-ink: #ef7676;
+  --color-warning-ink: #fab219;
+  --color-good-ink: #4cc94c;
+
+  --color-series-1: #3987e5;
+  --color-series-2: #d95926;
+  --color-series-3: #199e70;
+  --color-series-4: #c98500;
+  --color-series-5: #d55181;
+  --color-series-6: #008300;
+  --color-series-7: #9085e9;
+  --color-series-8: #e66767;
+
+}
+
+/*
+ * Sequential ramp for the interest heatmap — eight steps, each paired with the ink that clears
+ * 4.5:1 against it.
+ *
+ * Declared in a plain :root block rather than inside @theme on purpose. Tailwind v4 tree-shakes
+ * theme variables that no generated utility references, and these are consumed only from an inline
+ * `style` attribute — so under @theme they were silently dropped and every cell fell back to
+ * inherited colour. Two contrast findings are baked into the values:
+ *   - the ink flip sits between steps 4 and 5 in both modes;
+ *   - #2a78d6 is absent from the dark ramp: measured, it fails against BOTH inks (4.46:1 on
+ *     near-black, 4.48:1 on white), so no text colour rescues a cell painted with it.
+ */
+:root {
+  --color-seq-0: #f4f4f1;
+  --color-seq-1: #cde2fb;
+  --color-seq-2: #9ec5f4;
+  --color-seq-3: #6da7ec;
+  --color-seq-4: #3987e5;
+  --color-seq-5: #256abf;
+  --color-seq-6: #184f95;
+  --color-seq-7: #0d366b;
+  --color-seq-ink-0: #0b0b0b;
+  --color-seq-ink-1: #0b0b0b;
+  --color-seq-ink-2: #0b0b0b;
+  --color-seq-ink-3: #0b0b0b;
+  --color-seq-ink-4: #0b0b0b;
+  --color-seq-ink-5: #ffffff;
+  --color-seq-ink-6: #ffffff;
+  --color-seq-ink-7: #ffffff;
+}
+
+.dark {
+  --color-seq-0: #201f1e;
+  --color-seq-1: #16283d;
+  --color-seq-2: #184f95;
+  --color-seq-3: #1c5cab;
+  --color-seq-4: #256abf;
+  --color-seq-5: #3987e5;
+  --color-seq-6: #6da7ec;
+  --color-seq-7: #9ec5f4;
+  --color-seq-ink-0: #ffffff;
+  --color-seq-ink-1: #ffffff;
+  --color-seq-ink-2: #ffffff;
+  --color-seq-ink-3: #ffffff;
+  --color-seq-ink-4: #ffffff;
+  --color-seq-ink-5: #0b0b0b;
+  --color-seq-ink-6: #0b0b0b;
+  --color-seq-ink-7: #0b0b0b;
 }
 
 body {
   background: var(--color-page);
   color: var(--color-ink-primary);
   font-family: var(--font-sans);
-  /* The one deliberately "noticeable" motion in this pass: toggling the theme fades rather than
-     snaps. Everything else is restrained hover/focus feedback (Card, StatTile, links, buttons). */
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
   transition:
-    background-color 300ms ease,
-    color 300ms ease;
+    background-color 200ms ease,
+    color 200ms ease;
 }
 
-/* Tabular numerals on every figure (Constitution: "tabular numerals on all figures"). */
+/* Tabular numerals on aligned columns — table cells and axis ticks. Standalone hero figures keep
+   proportional figures, per the dataviz skill's typography rule. */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+/* Wide content (tables, heatmaps, wide charts) scrolls inside its own container so the page body
+   never scrolls horizontally at any width. */
+.scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  /* Pair with `min-w-0` on the containing card: together these keep a wide table scrolling inside
+     its own box instead of widening the page. */
+  max-width: 100%;
+  min-width: 0;
 }
 
 @keyframes fade-in {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(3px);
   }
   to {
     opacity: 1;
@@ -92,7 +204,7 @@ body {
 }
 
 .animate-fade-in {
-  animation: fade-in 350ms ease-out;
+  animation: fade-in 260ms ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -106,4 +218,11 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* One focus treatment everywhere, so keyboard traversal is uniformly visible (FR-037). */
+:where(a, button, select, input, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
 }

@@ -3,7 +3,7 @@ import type { Severity } from "@/lib/data/types";
 import { buildHref } from "@/lib/filters/parse";
 import type { Insight } from "../types";
 import { THRESHOLDS } from "../thresholds";
-import { sumDealValue, groupByBranch } from "../helpers";
+import { sumDealValue, groupByBranch, evidenceHref } from "../helpers";
 
 export const slug = "cold-leads" as const;
 
@@ -58,6 +58,8 @@ export function run(ctx: AnalyticsContext): Insight[] {
       metric: { value: leads.length, comparison: THRESHOLDS.coldLeads.infoDays, unit: "count" },
       entity: { kind: "branch", id: branchId, label: branch.label },
       href: buildHref(`/branches/${branchId}`, ctx.filters),
+      evidenceHref: evidenceHref(ctx.filters, "cold", { branch: branchId }),
+      action: "Work the list this week — these are still open and still winnable.",
       evidence: leads.map((l) => l.id),
     });
   }

@@ -3,16 +3,14 @@ import { EmptyState } from "@/components/ui/EmptyState";
 
 export default function BranchNotFound() {
   return (
-    <div className="mx-auto max-w-lg py-16">
-      <EmptyState
-        title="Branch not found"
-        description="There is no branch with that identifier. It may have been mistyped, or the link may be out of date."
-      />
-      <div className="mt-4 text-center">
+    <EmptyState
+      title="Branch not found"
+      body="No branch with that identifier exists in this dataset. It may have been mistyped, or the link may be from a different data extract."
+      action={
         <Link href="/branches" className="text-sm font-medium text-accent hover:underline">
-          Back to all branches
+          See all branches →
         </Link>
-      </div>
-    </div>
+      }
+    />
   );
 }

@@ -19,9 +19,13 @@ describe("insight rule: channel-quality", () => {
     }
   });
 
-  it("drills through to the funnel view", () => {
+  it("drills through to the lead-source view, with its evidence link scoped to that source", () => {
     const insights = run(fullContext());
     expect(insights[0]?.id).toBe(`${slug}:social_media`);
-    expect(insights[0]?.href).toBe("/funnel");
+    // v2: the entity link goes to the source analysis, and a separate evidence link goes to the
+    // specific leads. Previously this pointed at /funnel, which showed neither.
+    expect(insights[0]?.href).toBe("/sources");
+    expect(insights[0]?.evidenceHref).toContain("/leads");
+    expect(insights[0]?.evidenceHref).toContain("source=social_media");
   });
 });

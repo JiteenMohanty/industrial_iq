@@ -390,3 +390,69 @@ path than the Spec Kit plan and the flatten creates no collision with it.
 - Rejected: leaving the nested layout and only documenting Vercel's Root Directory setting more
   prominently — rejected because the user explicitly asked for the nesting itself to be resolved,
   not for a better explanation of the workaround.
+
+
+## ADR-0011: The product is framed around gates, not funnel stages
+
+**Status**: Accepted
+
+**Context**: v1 presented a six-stage funnel as its primary diagnostic. A second analysis pass
+established that this dataset's funnel is strictly sequential (zero stage skips across 510 leads)
+and that the test drive is an absolute gate: of 391 contacted leads, the 91 that never took one
+produced zero deliveries. Two steps therefore decide 41.2% of all leads and Rs 52.16 Cr before any
+closing skill applies.
+
+**Decision**: Gate analysis (`lib/analytics/gates.ts`) is the primary frame. `computeGatesFor` takes
+an explicit lead pool so the same function serves the group view and a branch view without the scope
+confusion ADR-0005 exists to prevent. Gate figures are never scoped by the reader's time window —
+they are structural, and a narrow window must not shrink them.
+
+**Consequences**: The overview leads with three gates and their monetary loss. The six-stage funnel
+survives as a diagnostic on `/funnel`. A branch page shows its own gates beside its funnel. The
+framing is stated in-product with its evidence (0 of 91) rather than asserted.
+
+## ADR-0012: Ranking and headline selection are separate concerns
+
+**Status**: Accepted
+
+**Context**: `runInsights()` returns a strict total order. Slicing its top five for the landing feed
+produced four cards from one rule at four branches.
+
+**Decision**: `runInsights()` keeps the total order unchanged. A new `selectHeadlines()` performs
+round-robin selection across rules for presentation only.
+
+**Consequences**: The CSV endpoint, branch pages and the FR-010 determinism guarantee are unaffected
+— they consume the total order. The feed spans distinct problem types. The tradeoff is that the
+visible five are not strictly the five most severe instances, which is stated in `DECISIONS.md`.
+
+## ADR-0013: Charts are server-rendered unless interactivity earns the JavaScript
+
+**Status**: Accepted
+
+**Context**: v1 shipped Recharts on all routes (~210 kB first load), including pages with no
+interactive chart.
+
+**Decision**: Charts are HTML/CSS or inline SVG with native `title` tooltips by default. Recharts is
+used only for `TrendChart` (crosshair over a time series) and `RepScatter` (per-point tooltip in a
+2-D field).
+
+**Consequences**: Seven of nine routes ship no chart JS (~106 kB). Chart components stay Server
+Components, so view-shaped data never crosses the client boundary. Tooltip appearance is the
+browser's native rendering and cannot be styled — accepted, since it is keyboard- and
+screen-reader-accessible for free.
+
+## ADR-0014: Design-token contrast is asserted by test, not reviewed
+
+**Status**: Accepted
+
+**Context**: v1 recorded its accessibility pass as "verified by structural code review". Measuring
+the rendered pages found three real WCAG failures, one of them a colour that fails against both
+black and white text.
+
+**Decision**: `tests/design/contrast.spec.ts` parses `globals.css` and asserts every
+text/background token pair against its WCAG floor, in both themes. Constitution Principle VIII
+generalises the rule.
+
+**Consequences**: A palette edit that breaks the floor fails the suite rather than shipping. The
+sequential ramp's ink flip and the exclusion of `#2a78d6` from the dark ramp are both pinned by
+test. Contrast is no longer something a reviewer has to remember to check.

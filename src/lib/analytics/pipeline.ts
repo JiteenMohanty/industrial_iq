@@ -1,6 +1,8 @@
 import type { AnalyticsContext } from "./context";
 
 export interface StuckOrder {
+  /** Carried so the watchlist can show what the customer is actually waiting for. */
+  modelInterested: string;
   leadId: string;
   customerName: string;
   branchLabel: string;
@@ -39,6 +41,7 @@ export function computeStuckOrders(ctx: AnalyticsContext): StuckOrder[] {
     .map((l) => ({
       leadId: l.id,
       customerName: l.customerName,
+      modelInterested: l.modelInterested,
       branchLabel: l.branch.label,
       branchId: l.branchId,
       repName: l.rep.name,

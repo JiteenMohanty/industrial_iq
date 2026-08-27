@@ -5,7 +5,15 @@ import { useTheme } from "./ThemeProvider";
 /** Inline SVG icons rather than a dependency — this is the only icon this product needs. */
 function SunIcon() {
   return (
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+    <svg
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+    >
       <circle cx="12" cy="12" r="4" />
       <path
         strokeLinecap="round"
@@ -17,7 +25,7 @@ function SunIcon() {
 
 function MoonIcon() {
   return (
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
       <path d="M20.354 15.354A9 9 0 0 1 8.646 3.646a9.003 9.003 0 1 0 11.708 11.708Z" />
     </svg>
   );

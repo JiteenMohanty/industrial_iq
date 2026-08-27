@@ -1,6 +1,7 @@
 import type { AnalyticsContext } from "./context";
-import type { LeadStatus, RepRole, Stage } from "@/lib/data/types";
+import type { LeadStatus, RepRole, Source, Stage } from "@/lib/data/types";
 import { sumDealValue } from "../insights/helpers";
+import { rate } from "./benchmark";
 
 export interface RepPerformance {
   repId: string;
@@ -14,6 +15,21 @@ export interface RepPerformance {
   conversionPct: number | null;
   openLeadCount: number;
   openPipelineValueRupees: number;
+
+  // --- v2: the two gate metrics.
+  // Conversion alone tells a manager a rep is behind but not what to do about it. Contact rate and
+  // test-drive rate are the two things a rep actually controls day to day, and on this dataset
+  // they explain almost all of the conversion spread — the range across reps runs 33.3%-94.1% on
+  // contact and 30.0%-92.9% on test drives. They are the coachable numbers; conversion is the
+  // scoreboard.
+  contactedCount: number;
+  contactRatePct: number | null;
+  testDrivenCount: number;
+  /** Test drives as a share of the rep's *contacted* leads, not of all assigned leads. */
+  testDriveRatePct: number | null;
+  revenueRupees: number;
+  /** Revenue across every lead assigned — the efficiency figure a volume count hides. */
+  revenuePerLeadRupees: number | null;
 }
 
 /**
@@ -29,6 +45,9 @@ export function computeRepPerformance(ctx: AnalyticsContext): RepPerformance[] {
     const leads = ctx.groupLeads.filter((l) => l.assignedTo === rep.id);
     const delivered = leads.filter((l) => l.reachedStages.has("delivered"));
     const open = leads.filter((l) => l.isOpen);
+    const contacted = leads.filter((l) => l.wasContacted);
+    const testDriven = leads.filter((l) => l.tookTestDrive);
+    const revenue = sumDealValue(delivered);
 
     return {
       repId: rep.id,
@@ -41,6 +60,12 @@ export function computeRepPerformance(ctx: AnalyticsContext): RepPerformance[] {
       conversionPct: leads.length > 0 ? (delivered.length / leads.length) * 100 : null,
       openLeadCount: open.length,
       openPipelineValueRupees: sumDealValue(open),
+      contactedCount: contacted.length,
+      contactRatePct: rate(contacted.length, leads.length),
+      testDrivenCount: testDriven.length,
+      testDriveRatePct: rate(testDriven.length, contacted.length),
+      revenueRupees: revenue,
+      revenuePerLeadRupees: leads.length === 0 ? null : revenue / leads.length,
     };
   });
 
@@ -60,6 +85,9 @@ export interface RepAssignedLead {
   ageDays: number;
   dealValueRupees: number;
   isOpen: boolean;
+  source: Source;
+  tookTestDrive: boolean;
+  daysSinceActivity: number;
 }
 
 export interface RepDetail {
@@ -73,6 +101,10 @@ export interface RepDetail {
   deliveredCount: number;
   conversionPct: number | null;
   openPipelineValueRupees: number;
+  contactRatePct: number | null;
+  testDriveRatePct: number | null;
+  revenueRupees: number;
+  revenuePerLeadRupees: number | null;
   /**
    * Every lead ever assigned to this rep (open, delivered, and lost), oldest first — FR-024 asks
    * for "assigned leads with the age of each" without restricting to open ones, and a rep's full
@@ -90,6 +122,9 @@ export function computeRepDetail(ctx: AnalyticsContext, repId: string): RepDetai
   const leads = ctx.groupLeads.filter((l) => l.assignedTo === repId);
   const delivered = leads.filter((l) => l.reachedStages.has("delivered"));
   const open = leads.filter((l) => l.isOpen);
+  const contacted = leads.filter((l) => l.wasContacted);
+  const testDriven = leads.filter((l) => l.tookTestDrive);
+  const revenue = sumDealValue(delivered);
 
   const assignedLeads: RepAssignedLead[] = [...leads]
     .sort((a, b) => b.ageDays - a.ageDays)
@@ -102,6 +137,9 @@ export function computeRepDetail(ctx: AnalyticsContext, repId: string): RepDetai
       ageDays: l.ageDays,
       dealValueRupees: l.dealValue,
       isOpen: l.isOpen,
+      source: l.source,
+      tookTestDrive: l.tookTestDrive,
+      daysSinceActivity: l.daysSinceActivity,
     }));
 
   return {
@@ -115,6 +153,10 @@ export function computeRepDetail(ctx: AnalyticsContext, repId: string): RepDetai
     deliveredCount: delivered.length,
     conversionPct: leads.length > 0 ? (delivered.length / leads.length) * 100 : null,
     openPipelineValueRupees: sumDealValue(open),
+    contactRatePct: rate(contacted.length, leads.length),
+    testDriveRatePct: rate(testDriven.length, contacted.length),
+    revenueRupees: revenue,
+    revenuePerLeadRupees: leads.length === 0 ? null : revenue / leads.length,
     assignedLeads,
   };
 }

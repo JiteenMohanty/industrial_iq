@@ -1,17 +1,24 @@
+import type { ReactNode } from "react";
+
+/**
+ * Empty state. Always says *why* it is empty and what would change it — an empty region with no
+ * explanation reads as a loading failure, which is exactly the confusion FR-009b and FR-035 exist
+ * to prevent.
+ */
 export function EmptyState({
   title,
-  description,
+  body,
+  action,
 }: {
   title: string;
-  description?: string;
+  body?: string;
+  action?: ReactNode;
 }) {
   return (
-    <div
-      role="status"
-      className="flex flex-col items-center justify-center rounded-lg border border-dashed border-grid p-8 text-center"
-    >
+    <div className="rounded-[var(--radius-card)] border border-dashed border-border-strong bg-surface px-4 py-8 text-center">
       <p className="text-sm font-medium text-ink-primary">{title}</p>
-      {description && <p className="mt-1 text-sm text-ink-secondary">{description}</p>}
+      {body && <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-ink-muted">{body}</p>}
+      {action && <div className="mt-3">{action}</div>}
     </div>
   );
 }

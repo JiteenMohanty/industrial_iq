@@ -4,7 +4,7 @@ import { buildHref } from "@/lib/filters/parse";
 import { formatPercent } from "@/lib/format";
 import type { Insight } from "../types";
 import { THRESHOLDS } from "../thresholds";
-import { sumDealValue, groupByBranch } from "../helpers";
+import { sumDealValue, groupByBranch, evidenceHref } from "../helpers";
 
 export const slug = "funnel-collapse" as const;
 
@@ -64,6 +64,8 @@ export function run(ctx: AnalyticsContext): Insight[] {
       metric: { value: worstBranchPct, comparison: worstGroupPct, unit: "pct" },
       entity: { kind: "branch", id: branchId, label: branch.label },
       href: buildHref(`/branches/${branchId}`, ctx.filters),
+      evidenceHref: evidenceHref(ctx.filters, "all", { branch: branchId }),
+      action: "Sit in on this stage at this branch before changing targets or headcount.",
       evidence: droppedOff.map((l) => l.id),
     });
   }

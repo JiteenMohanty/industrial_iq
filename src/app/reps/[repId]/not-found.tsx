@@ -3,16 +3,14 @@ import { EmptyState } from "@/components/ui/EmptyState";
 
 export default function RepNotFound() {
   return (
-    <div className="mx-auto max-w-lg py-16">
-      <EmptyState
-        title="Sales rep not found"
-        description="There is no sales rep with that identifier. It may have been mistyped, or the link may be out of date."
-      />
-      <div className="mt-4 text-center">
-        <Link href="/branches" className="text-sm font-medium text-accent hover:underline">
-          Back to all branches
+    <EmptyState
+      title="Sales rep not found"
+      body="No sales rep with that identifier exists in this dataset. It may have been mistyped, or the link may be from a different data extract."
+      action={
+        <Link href="/reps" className="text-sm font-medium text-accent hover:underline">
+          See all reps →
         </Link>
-      </div>
-    </div>
+      }
+    />
   );
 }

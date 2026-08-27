@@ -166,6 +166,19 @@ export interface EnrichedLead {
   ageDays: number;
   daysSinceActivity: number;
   daysSinceOrder: number | null;
+
+  // --- Second-pass additions (v2). The EDA established that the funnel is strictly sequential
+  // and that the test drive is an absolute gate: across all 510 leads, zero skipped a stage and
+  // zero of the 91 contacted-but-never-test-driven leads ever reached delivery. `wasContacted`
+  // and `tookTestDrive` are therefore first-class fields, not ad-hoc `reachedStages.has(...)`
+  // calls scattered through the analytics layer.
+  wasContacted: boolean;
+  tookTestDrive: boolean;
+  /** Full sales cycle in days, lead creation -> delivery. Null unless delivered. */
+  cycleDays: number | null;
+  expectedCloseAt: Date;
+  /** Delivered date minus promised close date. Positive = late. Null unless delivered. */
+  closeSlipDays: number | null;
   delivery: EnrichedDelivery | null;
   branch: Branch;
   rep: Rep;
@@ -180,10 +193,14 @@ export interface Dataset {
   dataAsOf: Date;
   minCreatedAt: Date;
   months: readonly string[]; // "YYYY-MM", every month present in `targets`, ascending
+  models: readonly string[]; // every distinct model_interested, by descending lead volume
+  sources: readonly Source[]; // every distinct source, by descending lead volume
 
   leadById: ReadonlyMap<string, EnrichedLead>;
   leadsByBranch: ReadonlyMap<string, EnrichedLead[]>;
   leadsByRep: ReadonlyMap<string, EnrichedLead[]>;
+  leadsByModel: ReadonlyMap<string, EnrichedLead[]>;
+  leadsBySource: ReadonlyMap<Source, EnrichedLead[]>;
   deliveryByLeadId: ReadonlyMap<string, EnrichedDelivery>;
   targetsByBranchMonth: ReadonlyMap<string, RawTarget>;
   repById: ReadonlyMap<string, Rep>;

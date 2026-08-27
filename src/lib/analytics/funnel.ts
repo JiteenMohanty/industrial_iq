@@ -8,6 +8,13 @@ export interface FunnelStagePoint {
   pctOfTop: number;
   /** Percentage points lost since the previous stage; null for the first stage ("new"). */
   dropOffFromPrevious: number | null;
+  /**
+   * Share of the previous stage that reached this one; null for the first stage. The complement of
+   * `dropOffFromPrevious`, carried explicitly because every comparison in the product is phrased
+   * as "converts X%" rather than "loses Y%", and deriving it at each call site invited the two
+   * being mixed up in the same sentence.
+   */
+  stepConversionPct: number | null;
 }
 
 export interface FunnelResult {
@@ -36,10 +43,10 @@ export function computeFunnel(
   const stages: FunnelStagePoint[] = FUNNEL_STAGES.map((stage, i) => {
     const count = leads.filter((l) => l.reachedStages.has(stage)).length;
     const pctOfTop = top > 0 ? (count / top) * 100 : 0;
-    const dropOffFromPrevious =
-      i === 0 ? null : prevCount > 0 ? 100 - (count / prevCount) * 100 : null;
+    const stepConversionPct = i === 0 ? null : prevCount > 0 ? (count / prevCount) * 100 : null;
+    const dropOffFromPrevious = stepConversionPct === null ? null : 100 - stepConversionPct;
     prevCount = count;
-    return { stage, count, pctOfTop, dropOffFromPrevious };
+    return { stage, count, pctOfTop, dropOffFromPrevious, stepConversionPct };
   });
 
   return { stages };
@@ -49,9 +56,16 @@ export interface StageDuration {
   fromStage: Stage;
   toStage: Stage;
   avgDays: number;
+  /**
+   * Median is what the UI shows. Kept alongside the mean rather than replacing it because the two
+   * diverge whenever a distribution has a tail, and seeing them agree here is itself the evidence
+   * that this dataset's stage durations are bounded rather than realistically skewed.
+   */
+  medianDays: number;
+  sampleSize: number;
 }
 
-/** Average time between consecutive stage timestamps, over leads that reached both. */
+/** Time between consecutive stage timestamps, over leads that reached both. */
 export function computeStageDurations(ctx: AnalyticsContext): StageDuration[] {
   const leads = ctx.groupLeads;
   const durations: StageDuration[] = [];
@@ -68,10 +82,21 @@ export function computeStageDurations(ctx: AnalyticsContext): StageDuration[] {
       if (fromTs && toTs) gaps.push(daysBetween(fromTs, toTs));
     }
 
+    const sorted = [...gaps].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    const medianDays =
+      sorted.length === 0
+        ? 0
+        : sorted.length % 2 === 1
+          ? (sorted[mid] as number)
+          : ((sorted[mid - 1] as number) + (sorted[mid] as number)) / 2;
+
     durations.push({
       fromStage: from,
       toStage: to,
       avgDays: gaps.length > 0 ? gaps.reduce((sum, d) => sum + d, 0) / gaps.length : 0,
+      medianDays,
+      sampleSize: gaps.length,
     });
   }
   return durations;
@@ -90,6 +115,7 @@ export interface LossReasonBucket {
 export interface LossBreakdown {
   byStage: LossStageBucket[];
   byReason: LossReasonBucket[];
+  totalLost: number;
 }
 
 /**
@@ -113,9 +139,13 @@ export function computeLossBreakdown(ctx: AnalyticsContext): LossBreakdown {
   }
 
   return {
-    byStage: Array.from(byStageMap.entries()).map(([stage, count]) => ({ stage, count })),
+    byStage: FUNNEL_STAGES.filter((s) => byStageMap.has(s)).map((stage) => ({
+      stage,
+      count: byStageMap.get(stage) ?? 0,
+    })),
     byReason: Array.from(byReasonMap.entries())
       .map(([reason, count]) => ({ reason, count }))
       .sort((a, b) => b.count - a.count),
+    totalLost: lost.length,
   };
 }

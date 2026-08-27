@@ -3,7 +3,7 @@ import { buildHref } from "@/lib/filters/parse";
 import { formatDays } from "@/lib/format";
 import type { Insight } from "../types";
 import { THRESHOLDS } from "../thresholds";
-import { sumDealValue, groupByBranch } from "../helpers";
+import { sumDealValue, groupByBranch, evidenceHref } from "../helpers";
 
 export const slug = "stuck-orders" as const;
 
@@ -38,6 +38,8 @@ export function run(ctx: AnalyticsContext): Insight[] {
       metric: { value: leads.length, comparison: THRESHOLDS.stuckOrders.minDays, unit: "count" },
       entity: { kind: "branch", id: branchId, label: branch.label },
       href: buildHref("/deliveries", ctx.filters, { branchId }),
+      evidenceHref: evidenceHref(ctx.filters, "stuck_orders", { branch: branchId }),
+      action: "Call each customer with a delivery date, or release the allocation.",
       evidence: leads.map((l) => l.id),
     });
   }

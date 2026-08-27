@@ -4,7 +4,7 @@ import { buildHref } from "@/lib/filters/parse";
 import { formatPercent } from "@/lib/format";
 import type { Insight } from "../types";
 import { THRESHOLDS } from "../thresholds";
-import { sumDealValue } from "../helpers";
+import { sumDealValue, evidenceHref } from "../helpers";
 
 export const slug = "rep-outlier" as const;
 
@@ -49,6 +49,8 @@ export function run(ctx: AnalyticsContext): Insight[] {
       metric: { value: repRatePct, comparison: branchRatePct, unit: "pct" },
       entity: { kind: "rep", id: rep.id, label: rep.name },
       href: buildHref(`/reps/${rep.id}`, ctx.filters),
+      evidenceHref: evidenceHref(ctx.filters, "all", { rep: rep.id }),
+      action: "Review this rep's pipeline with their branch manager.",
       evidence: repLeads.map((l) => l.id),
     });
   }

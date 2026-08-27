@@ -1,134 +1,280 @@
 import Link from "next/link";
-import { getDataset } from "@/lib/data/dataset";
-import { buildContext } from "@/lib/analytics/context";
-import { parseFilters, buildParseFiltersContext, buildHref } from "@/lib/filters/parse";
+import { resolvePage, type SearchParams } from "@/lib/filters/page-context";
+import { buildHref } from "@/lib/filters/parse";
 import { computeFunnel, computeStageDurations, computeLossBreakdown } from "@/lib/analytics/funnel";
-import { computeChannelPerformance } from "@/lib/analytics/channels";
-import { formatCount, formatPercent, formatDays } from "@/lib/format";
-import { FunnelChart } from "@/components/charts/FunnelChart";
-import { Card } from "@/components/ui/Card";
+import { computeGates, computeBranchGates } from "@/lib/analytics/gates";
+import { formatCount, formatCurrency, formatPercent, formatDays } from "@/lib/format";
+import { Card, SectionHeading } from "@/components/ui/Card";
+import { Callout, Figure } from "@/components/ui/Callout";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { DataTable, type Column } from "@/components/ui/DataTable";
-import type { LossReasonBucket } from "@/lib/analytics/funnel";
-import type { ChannelPerformance } from "@/lib/analytics/channels";
+import { FunnelChart } from "@/components/charts/FunnelChart";
+import { DistributionBars } from "@/components/charts/RankedBar";
+import { GateFunnel } from "@/components/charts/GateFunnel";
 
-type SearchParams = { [key: string]: string | string[] | undefined };
-
-function toURLSearchParams(sp: SearchParams): URLSearchParams {
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(sp)) {
-    if (typeof value === "string") params.set(key, value);
-    else if (Array.isArray(value) && value[0] !== undefined) params.set(key, value[0]);
-  }
-  return params;
-}
+export const metadata = { title: "Funnel · DealerPulse" };
 
 export default async function FunnelPage({
   searchParams,
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const resolvedSearchParams = await searchParams;
-  const urlParams = toURLSearchParams(resolvedSearchParams);
-  const dataset = getDataset();
-  const filters = parseFilters(urlParams, buildParseFiltersContext(dataset));
-  const ctx = buildContext(filters);
+  const { filters, ctx, param } = await resolvePage(searchParams);
 
-  // `overlay` is deliberately separate from the shared branch filter — narrowing the branch
-  // filter would also narrow the "group" baseline this chart compares against, defeating the
-  // overlay's purpose (compare one branch against the whole group, not filter everything to it).
-  const overlayBranchId = urlParams.get("overlay");
-  const overlayBranch = overlayBranchId ? dataset.branchById.get(overlayBranchId) : undefined;
+  // Deliberately separate from the shared branch filter: narrowing the branch filter would also
+  // narrow the group baseline this overlay compares against, which defeats the comparison.
+  const overlayId = param("overlay");
+  const overlayBranch = overlayId ? ctx.dataset.branchById.get(overlayId) : undefined;
 
-  const groupFunnel = computeFunnel(ctx);
-  const branchFunnel = overlayBranchId ? computeFunnel(ctx, { branchId: overlayBranchId }) : undefined;
+  const group = computeFunnel(ctx);
+  const overlay = overlayBranch ? computeFunnel(ctx, { branchId: overlayBranch.id }) : undefined;
   const durations = computeStageDurations(ctx);
-  const lossBreakdown = computeLossBreakdown(ctx);
-  const channels = computeChannelPerformance(ctx);
+  const loss = computeLossBreakdown(ctx);
+  const gates = computeGates(ctx);
+  const branchGates = computeBranchGates(ctx);
 
-  function overlayHref(branchId: string | null): string {
-    const base = buildHref("/funnel", filters);
-    if (!branchId) return base;
-    const separator = base.includes("?") ? "&" : "?";
-    return `${base}${separator}overlay=${branchId}`;
-  }
+  const worstStep = [...group.stages]
+    .filter((s) => s.stepConversionPct !== null)
+    .sort((a, b) => (a.stepConversionPct as number) - (b.stepConversionPct as number))[0];
 
-  const reasonColumns: Column<LossReasonBucket>[] = [
+  const slowest = [...durations].sort((a, b) => b.medianDays - a.medianDays)[0];
+
+  const lossColumns: Column<(typeof loss.byReason)[number]>[] = [
     { header: "Reason", accessor: (r) => r.reason },
-    { header: "Losses", align: "right", accessor: (r) => formatCount(r.count) },
-  ];
-
-  const channelColumns: Column<ChannelPerformance>[] = [
-    { header: "Channel", accessor: (c) => c.channel.replace("_", " ") },
-    { header: "Leads", align: "right", accessor: (c) => formatCount(c.totalLeads) },
-    { header: "Conversion", align: "right", accessor: (c) => formatPercent(c.conversionPct) },
+    { header: "Leads", align: "right", accessor: (r) => formatCount(r.count) },
+    {
+      header: "Share",
+      align: "right",
+      accessor: (r) => formatPercent((r.count / Math.max(loss.totalLost, 1)) * 100, 0),
+    },
   ];
 
   return (
     <div className="animate-fade-in space-y-8">
-      <section aria-label="Conversion funnel">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-ink-primary">Conversion funnel</h2>
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-ink-secondary">Overlay branch:</span>
-            <Link
-              href={overlayHref(null)}
-              className={`rounded-full px-2 py-1 transition-all duration-150 ${!overlayBranchId ? "bg-gradient-to-r from-accent to-accent-hover text-white shadow-sm" : "text-accent hover:underline"}`}
+      <section aria-label="Gates">
+        <SectionHeading
+          title="The two gates"
+          as="h1"
+          hint="Full history, every branch. Contact and test drive decide the outcome before any negotiating skill applies."
+        />
+        <div className="grid gap-4 lg:grid-cols-5">
+          <Card className="lg:col-span-3">
+            <GateFunnel
+              gates={gates}
+              hrefs={{
+                neverContacted: buildHref("/leads", filters, undefined, {
+                  cohort: "never_contacted",
+                }),
+                noTestDrive: buildHref("/leads", filters, undefined, { cohort: "no_test_drive" }),
+                notClosed: buildHref("/leads", filters, undefined, { cohort: "lost" }),
+              }}
+            />
+          </Card>
+          <div className="space-y-4 lg:col-span-2">
+            <Callout tone="critical" label="Why this framing">
+              Across all {formatCount(ctx.groupLeads.length)} leads, not one skipped a stage, and{" "}
+              <Figure>
+                {gates.noTestDriveDelivered} of {formatCount(gates.noTestDriveCount)}
+              </Figure>{" "}
+              contacted-but-never-test-driven leads were ever delivered. The funnel is strictly
+              sequential and the test drive is the hard gate, so everything downstream is competing
+              for a pool these two steps have already fixed the size of.
+            </Callout>
+            <Callout
+              tone="neutral"
+              label="Worst step"
+              href={buildHref("/leads", filters, undefined, { cohort: "lost" })}
+              linkText="See lost leads"
             >
-              None
-            </Link>
-            {dataset.branches.map((b) => (
-              <Link
-                key={b.id}
-                href={overlayHref(b.id)}
-                className={`rounded-full px-2 py-1 transition-all duration-150 ${overlayBranchId === b.id ? "bg-gradient-to-r from-accent to-accent-hover text-white shadow-sm" : "text-accent hover:underline"}`}
-              >
-                {b.name}
-              </Link>
-            ))}
+              Group-wide the weakest single transition is into{" "}
+              <Figure>{worstStep?.stage.replace(/_/g, " ")}</Figure> at{" "}
+              <Figure>{formatPercent(worstStep?.stepConversionPct ?? 0)}</Figure>. The slowest is{" "}
+              <Figure>
+                {slowest?.fromStage.replace(/_/g, " ")} → {slowest?.toStage.replace(/_/g, " ")}
+              </Figure>{" "}
+              at a median of <Figure>{formatDays(slowest?.medianDays ?? 0)}</Figure>. Slow and leaky
+              are different problems — this pairing tells them apart.
+            </Callout>
           </div>
         </div>
-        <FunnelChart
-          group={groupFunnel.stages}
-          branch={branchFunnel?.stages}
-          branchLabel={overlayBranch?.label}
-        />
       </section>
 
-      <section aria-label="Time spent per stage">
-        <h2 className="mb-3 text-lg font-semibold text-ink-primary">Typical time per stage</h2>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-          {durations.map((d) => (
-            <Card key={`${d.fromStage}-${d.toStage}`} className="text-center">
-              <div className="text-xs text-ink-secondary">
-                {d.fromStage.replace("_", " ")} → {d.toStage.replace("_", " ")}
-              </div>
-              <div className="tabular-nums mt-1 text-lg font-semibold text-ink-primary">
-                {formatDays(Math.round(d.avgDays))}
-              </div>
-            </Card>
-          ))}
-        </div>
+      <section aria-label="Conversion funnel">
+        <Card>
+          <SectionHeading
+            title="Stage funnel"
+            hint="Bar length is the population still alive at each stage; the percentage beside it is conversion from the previous stage."
+            action={
+              <SegmentedControl
+                label="Branch overlay"
+                activeKey={overlayBranch?.id ?? "none"}
+                options={[
+                  { key: "none", label: "Group only" },
+                  ...ctx.dataset.branches.map((b) => ({
+                    key: b.id,
+                    label: b.name.replace(" Toyota", ""),
+                    title: `Overlay ${b.label}`,
+                  })),
+                ]}
+                hrefFor={(key) =>
+                  buildHref("/funnel", filters, undefined, {
+                    overlay: key === "none" ? undefined : key,
+                  })
+                }
+              />
+            }
+          />
+          <FunnelChart
+            group={group}
+            overlay={overlay}
+            overlayLabel={overlayBranch?.name}
+          />
+          {overlayBranch && overlay && (
+            <p className="mt-3 border-l-2 border-series-2 pl-3 text-xs leading-relaxed text-ink-secondary">
+              {(() => {
+                const gaps = overlay.stages
+                  .map((s, i) => ({
+                    stage: s.stage,
+                    gap:
+                      s.stepConversionPct !== null &&
+                      group.stages[i]?.stepConversionPct !== undefined &&
+                      group.stages[i]?.stepConversionPct !== null
+                        ? (s.stepConversionPct as number) -
+                          (group.stages[i]?.stepConversionPct as number)
+                        : null,
+                  }))
+                  .filter((g) => g.gap !== null);
+                const behind = gaps.filter((g) => (g.gap as number) < -5);
+                if (behind.length === 0) {
+                  return `${overlayBranch.name} tracks the group shape within 5 points at every stage.`;
+                }
+                if (behind.length === gaps.length) {
+                  return `${overlayBranch.name} is behind the group at every single transition, by ${Math.round(
+                    Math.min(...behind.map((b) => Math.abs(b.gap as number))),
+                  )} to ${Math.round(
+                    Math.max(...behind.map((b) => Math.abs(b.gap as number))),
+                  )} points. That is not one broken stage — it is the whole branch, which points at management rather than a training gap at one step.`;
+                }
+                return `${overlayBranch.name} falls behind the group at ${behind
+                  .map((b) => b.stage.replace(/_/g, " "))
+                  .join(", ")} and tracks it elsewhere.`;
+              })()}
+            </p>
+          )}
+        </Card>
       </section>
 
-      <section aria-label="Lost reasons and channel quality" className="grid gap-6 lg:grid-cols-2">
-        <div>
-          <h2 className="mb-3 text-lg font-semibold text-ink-primary">Why leads are lost</h2>
-          <DataTable
-            columns={reasonColumns}
-            rows={lossBreakdown.byReason}
-            rowKey={(r) => r.reason}
-            caption="Loss reasons, most common first"
+      <section aria-label="Branch gate comparison">
+        <Card>
+          <SectionHeading
+            title="Gate rates by branch"
+            hint="Where each branch loses its leads, on the same basis."
           />
-        </div>
-        <div>
-          <h2 className="mb-3 text-lg font-semibold text-ink-primary">Channel quality</h2>
           <DataTable
-            columns={channelColumns}
-            rows={channels}
-            rowKey={(c) => c.channel}
-            caption="Conversion rate by acquisition channel"
+            minWidth={620}
+            columns={[
+              { header: "Branch", accessor: (r) => r.branchName.replace(" Toyota", "") },
+              { header: "Leads", align: "right", accessor: (r) => formatCount(r.leads) },
+              {
+                header: "Contact",
+                align: "right",
+                hint: "of leads",
+                accessor: (r) => (r.contactRatePct === null ? "—" : formatPercent(r.contactRatePct)),
+              },
+              {
+                header: "Test drive",
+                align: "right",
+                hint: "of contacted",
+                accessor: (r) =>
+                  r.testDriveRatePct === null ? "—" : formatPercent(r.testDriveRatePct),
+              },
+              {
+                header: "Close",
+                align: "right",
+                hint: "of test-driven",
+                accessor: (r) => (r.closeRatePct === null ? "—" : formatPercent(r.closeRatePct)),
+              },
+              {
+                header: "Lost pre-test-drive",
+                align: "right",
+                accessor: (r) => formatCurrency(r.preTestDriveLostValueRupees),
+              },
+            ]}
+            rows={branchGates}
+            getRowKey={(r) => r.branchId}
+            rowHref={(r) => buildHref(`/branches/${r.branchId}`, filters)}
+            caption="Gate pass rates by branch"
           />
-        </div>
+        </Card>
+      </section>
+
+      <section aria-label="Stage durations and loss analysis" className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <SectionHeading
+            title="Time at each stage"
+            hint="Median days between consecutive stages, for leads that made the transition."
+          />
+          <DistributionBars
+            buckets={durations.map((d) => ({
+              label: `${d.fromStage.replace(/_/g, " ")} → ${d.toStage.replace(/_/g, " ")}`,
+              count: Math.round(d.medianDays),
+            }))}
+            totalLabel="Bars are median days, not lead counts."
+          />
+          <p className="mt-3 text-[11px] leading-relaxed text-ink-muted">
+            Every transition in this dataset has a hard ceiling and almost no tail — the longest
+            first contact on record is 3.3 days. Real pipelines are heavily right-skewed, so the
+            aging thresholds used elsewhere in this product are calibrated to a distribution that
+            production data would not share.
+          </p>
+        </Card>
+
+        <Card>
+          <SectionHeading
+            title="Why leads are lost"
+            hint={`${formatCount(loss.totalLost)} losses, derived from recorded stage history rather than the flat status field.`}
+          />
+          <DataTable
+            minWidth={360}
+            columns={lossColumns}
+            rows={loss.byReason}
+            getRowKey={(r) => r.reason}
+            caption="Loss reasons"
+          />
+          <p className="mt-3 text-[11px] leading-relaxed text-ink-muted">
+            Treat these as weak evidence. The eight reasons are near-uniform (nothing above{" "}
+            {formatPercent(
+              (Math.max(...loss.byReason.map((r) => r.count)) / Math.max(loss.totalLost, 1)) * 100,
+              0,
+            )}
+            ), and the field is not consistent with the stage reached — leads recorded as
+            &ldquo;dissatisfied with test drive&rdquo; include some that never took one. The stage a
+            lead died at is the reliable signal here; the stated reason is not.
+          </p>
+        </Card>
+      </section>
+
+      <section aria-label="Losses by stage">
+        <Card>
+          <SectionHeading
+            title="Where losses happen"
+            hint="The stage each lost lead had reached when it exited."
+          />
+          <DistributionBars
+            buckets={loss.byStage.map((s) => ({
+              label: s.stage.replace(/_/g, " "),
+              count: s.count,
+              tone: s.stage === "new" ? "critical" : "accent",
+            }))}
+            totalLabel={`${formatCount(loss.totalLost)} losses in total. The largest bucket is leads lost at "new" — before anyone spoke to them.`}
+          />
+          <Link
+            href={buildHref("/leads", filters, undefined, { cohort: "never_contacted" })}
+            className="mt-3 inline-block text-xs font-medium text-accent hover:underline"
+          >
+            View the never-contacted leads →
+          </Link>
+        </Card>
       </section>
     </div>
   );
