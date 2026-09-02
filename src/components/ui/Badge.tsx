@@ -19,18 +19,55 @@ export function SeverityBadge({ severity }: { severity: Severity }) {
 }
 
 /**
- * Traffic-light status against the group figure. Rendered as glyph + optional label so the
- * judgement is never carried by the dot alone; the accessible name always states it in words.
+ * Traffic-light status against the group figure. Rendered as glyph + label so the judgement is
+ * never carried by the dot alone; the accessible name always states it in words.
+ *
+ * `title` carries the whole comparison — the gap in percentage points, the group figure it was
+ * measured against, and the sample it rests on. A glyph on its own is not self-describing, and the
+ * one question this control kept raising was "ahead of what, by how much?".
  */
-export function StatusDot({ status, showLabel = false }: { status: PerfStatus; showLabel?: boolean }) {
+export function StatusDot({
+  status,
+  showLabel = false,
+  title,
+}: {
+  status: PerfStatus;
+  showLabel?: boolean;
+  title?: string;
+}) {
   const meta = STATUS_META[status];
   return (
-    <span className={`inline-flex items-center gap-1.5 ${meta.ink}`} title={meta.label}>
+    <span
+      className={`inline-flex items-center gap-1.5 ${meta.ink}`}
+      title={title ?? meta.label}
+    >
       <span aria-hidden="true" className="text-[10px] leading-none">
         {meta.glyph}
       </span>
-      <span className={showLabel ? "text-xs" : "sr-only"}>{meta.label}</span>
+      <span className={showLabel ? "text-xs" : "sr-only"}>{title ?? meta.label}</span>
     </span>
+  );
+}
+
+/**
+ * The key for a table of benchmarked figures. Shown once beside any table that uses StatusDot,
+ * because five glyphs with no legend is a puzzle rather than a signal.
+ */
+export function StatusLegend({ groupNote }: { groupNote?: string }) {
+  const order: PerfStatus[] = ["good", "onPar", "warning", "critical", "unrated"];
+  return (
+    <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-ink-muted">
+      {order.map((s) => (
+        <span key={s} className={`inline-flex items-center gap-1 ${STATUS_META[s].ink}`}>
+          <span aria-hidden="true">{STATUS_META[s].glyph}</span>
+          {STATUS_META[s].label}
+        </span>
+      ))}
+      <span>
+        Bands are ±5 points around the group figure, then −10 for “well behind”.
+        {groupNote ? ` ${groupNote}` : ""}
+      </span>
+    </p>
   );
 }
 

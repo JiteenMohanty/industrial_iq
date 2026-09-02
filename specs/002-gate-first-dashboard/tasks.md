@@ -215,6 +215,23 @@ Demand after it shipped. Measurement found a second, larger cause.
 - [X] T325 Restate FR-035 rather than silently dropping it — the requirement changed meaning and the
   spec should say why.
 
+## Phase 12 — Status indicators meant two different things (post-review)
+
+- [X] T330 Split `neutral` into `onPar` and `unrated`. One dash was covering both "sample too small
+  to judge" and "within a few points of the group" — ten of twenty-five officers, five of each.
+- [X] T331 Make the bands contiguous, exhaustive and symmetric: >= +5 ahead, within ±5 in line,
+  -10 to -5 behind, <= -10 well behind, below 15 leads not rated. Previously 0 to +5 had no label
+  and fell into the unmeasured bucket.
+- [X] T332 Add `benchmark()`, returning status + gap + an explanatory sentence, so every mark can
+  state what it was measured against and by how much.
+- [X] T333 `StatusLegend` under the rep table, with the group figures for the current selection.
+- [X] T334 Fix the baseline scope bug this surfaced: `/reps` and `/sources` built baselines from
+  `computeGates(ctx)` (branch-scoped, not time-scoped) and `/reps` used `ctx.groupLeads` (neither),
+  so a rep'''s November rate was compared against an all-time group figure. All three now use
+  `windowLeads`. Verified: November baseline 75.8% vs full-range 76.7%.
+- [X] T335 Rewrite the benchmark suite for the five-state model, including an explicit test that
+  "in line" and "not rated" stay distinguishable. 338 passing across 37 files.
+
 ## Not done
 
 - [ ] T280 Live human 30-second storytelling test. Needs a reader who has not seen the data; the

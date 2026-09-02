@@ -210,6 +210,13 @@ sends bad leads" from "we never worked this channel's leads".
 - **FR-143a**: A comparison baseline MUST be drawn from the same time range as the figures it
   judges. Comparing a branch's November contact rate against an all-time group figure compares two
   different populations.
+- **FR-143b**: Status states MUST be mutually exclusive in meaning. "Not rated because the sample is
+  too small" and "measured, and level with the group" are different statements and MUST NOT share a
+  glyph or a label. The graded bands MUST be contiguous and exhaustive, so every measurable entity
+  receives exactly one status and none falls into the unrated bucket by omission.
+- **FR-143c**: Every status mark MUST be able to state, on hover and to assistive technology, the
+  figure it was compared against, the gap in percentage points, and the sample it rests on. A bare
+  glyph is not self-describing.
 
 **Loading and in-place navigation (revised post-review)**
 

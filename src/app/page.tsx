@@ -2,7 +2,7 @@ import Link from "next/link";
 import { resolvePage, type SearchParams } from "@/lib/filters/page-context";
 import { buildHref } from "@/lib/filters/parse";
 import { computeKpis } from "@/lib/analytics/kpis";
-import { computeGates, computeBranchGates } from "@/lib/analytics/gates";
+import { computeGates, computeGatesFor, computeBranchGates } from "@/lib/analytics/gates";
 import { computeRevenueTrend } from "@/lib/analytics/trends";
 import { runInsights } from "@/lib/insights/engine";
 import { rankBy, statusVsGroup, rate } from "@/lib/analytics/benchmark";
@@ -36,6 +36,9 @@ export default async function OverviewPage({
 
   const kpis = computeKpis(ctx);
   const gates = computeGates(ctx);
+  // Separate from `gates`: the branch table's status marks must be judged against every branch on
+  // the same time range, whereas `gates` above is the reader's own branch selection across all time.
+  const baselineGates = computeGatesFor(ctx.windowLeads);
   const insights = runInsights(ctx);
   const trend = computeRevenueTrend(ctx);
   const branchGates = computeBranchGates(ctx);
@@ -88,7 +91,7 @@ export default async function OverviewPage({
       accessor: (r) => (
         <span className="inline-flex items-center gap-1.5">
           <StatusDot
-            status={statusVsGroup(r.contactRatePct, gates.steps[0]?.passRatePct ?? null, r.leads)}
+            status={statusVsGroup(r.contactRatePct, baselineGates.steps[0]?.passRatePct ?? null, r.leads)}
           />
           {r.contactRatePct === null ? "—" : formatPercent(r.contactRatePct)}
         </span>
@@ -103,7 +106,7 @@ export default async function OverviewPage({
           <StatusDot
             status={statusVsGroup(
               r.testDriveRatePct,
-              gates.steps[1]?.passRatePct ?? null,
+              baselineGates.steps[1]?.passRatePct ?? null,
               r.leads,
             )}
           />

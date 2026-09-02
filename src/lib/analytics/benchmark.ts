@@ -12,21 +12,49 @@
  * the badge so the reader can see what the judgement was made against.
  */
 
-export type PerfStatus = "good" | "warning" | "critical" | "neutral";
+/**
+ * Five states, each meaning exactly one thing.
+ *
+ * The earlier set had four, and `neutral` was doing two unrelated jobs: "we will not judge this,
+ * the sample is too small" *and* "this sits within a few points of the group". Both rendered as a
+ * dash labelled "No reading", so a rep 3 points ahead of the group looked identical to one whose
+ * figures we were deliberately refusing to rate -- and a rep 43 points *behind* on a 12-lead book
+ * also showed that dash. That is worse than saying nothing, because it reads as a claim.
+ *
+ * `onPar` and `unrated` split those apart, and the bands are symmetric so "slightly ahead" has a
+ * label of its own rather than falling into the unmeasured bucket.
+ */
+export type PerfStatus = "good" | "onPar" | "warning" | "critical" | "unrated";
 
-/** Relative gap thresholds, in percentage points, applied to rate-style metrics (0-100). */
+/**
+ * Relative gap thresholds, in percentage points, applied to rate-style metrics (0-100).
+ *
+ * The bands are contiguous and exhaustive, so every measurable entity gets exactly one status:
+ *
+ *   gap >= +5          ahead of the group
+ *   -5 <  gap <  +5    in line with the group
+ *   -10 < gap <= -5    behind the group
+ *   gap <= -10         well behind the group
+ *
+ * Asymmetric at the bottom on purpose: being ten points behind is a different kind of problem from
+ * being five ahead, and that extra band is where a manager's attention should go.
+ */
 export const BENCHMARK = {
-  /** At or above group + this many points -> good. */
+  /** At or above group + this many points -> ahead. */
   goodGapPoints: 5,
-  /** At or below group - this many points -> critical. */
+  /** Within this many points either way -> in line with the group. */
+  onParGapPoints: 5,
+  /** At or below group - this many points -> well behind. */
   criticalGapPoints: 10,
-  /** Below this sample size, no status is assigned at all (never judge a tiny denominator). */
+  /** Below this sample size, no judgement is made at all (never rate a tiny denominator). */
   minSample: 15,
 } as const;
 
 /**
  * Compares a rate against the group rate and returns a traffic-light status.
- * Returns "neutral" — not a guess — when the value is null or the sample is too small.
+ *
+ * Returns "unrated" -- explicitly not a judgement -- when the value is unmeasurable or the sample
+ * is below the floor. Everything measurable lands in exactly one of the four graded bands.
  */
 export function statusVsGroup(
   value: number | null,
@@ -35,14 +63,57 @@ export function statusVsGroup(
   opts: { higherIsBetter?: boolean } = {},
 ): PerfStatus {
   const higherIsBetter = opts.higherIsBetter ?? true;
-  if (value === null || groupValue === null) return "neutral";
-  if (sample < BENCHMARK.minSample) return "neutral";
+  if (value === null || groupValue === null) return "unrated";
+  if (sample < BENCHMARK.minSample) return "unrated";
 
   const gap = higherIsBetter ? value - groupValue : groupValue - value;
   if (gap >= BENCHMARK.goodGapPoints) return "good";
   if (gap <= -BENCHMARK.criticalGapPoints) return "critical";
-  if (gap < 0) return "warning";
-  return "neutral";
+  if (gap <= -BENCHMARK.onParGapPoints) return "warning";
+  return "onPar";
+}
+
+export interface Benchmarked {
+  status: PerfStatus;
+  /** Signed difference from the group figure, in percentage points. Null when unrated. */
+  gapPoints: number | null;
+  /** Ready-made tooltip: the comparison spelled out, so the glyph never has to be guessed at. */
+  title: string;
+}
+
+/**
+ * One call per benchmarked cell: the status, the gap, and the sentence that explains both.
+ *
+ * Bundled together because a bare glyph is not self-describing -- the reader has to be told what it
+ * was measured against and by how much. Call sites were previously repeating that comparison by
+ * hand, or omitting it entirely.
+ */
+export function benchmark(
+  value: number | null,
+  groupValue: number | null,
+  sample: number,
+  opts: { label?: string; higherIsBetter?: boolean } = {},
+): Benchmarked {
+  const status = statusVsGroup(value, groupValue, sample, opts);
+  const what = opts.label ?? "This figure";
+
+  if (status === "unrated") {
+    const why =
+      value === null || groupValue === null
+        ? "cannot be calculated here"
+        : `rests on ${sample} ${sample === 1 ? "lead" : "leads"}, below the ${BENCHMARK.minSample}-lead floor for a fair comparison`;
+    return { status, gapPoints: null, title: `Not rated: ${what.toLowerCase()} ${why}.` };
+  }
+
+  const gap = (value as number) - (groupValue as number);
+  const rounded = Math.round(gap * 10) / 10;
+  const direction = rounded > 0 ? "above" : rounded < 0 ? "below" : "level with";
+  const magnitude = rounded === 0 ? "" : `${Math.abs(rounded)}pp `;
+  return {
+    status,
+    gapPoints: rounded,
+    title: `${what}: ${magnitude}${direction} the group figure of ${(groupValue as number).toFixed(1)}%, on ${sample} leads.`,
+  };
 }
 
 export interface Ranked<T> {

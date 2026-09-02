@@ -1,7 +1,7 @@
 import { resolvePage, type SearchParams } from "@/lib/filters/page-context";
 import { buildHref } from "@/lib/filters/parse";
 import { computeSourcePerformance } from "@/lib/analytics/sources";
-import { computeGates } from "@/lib/analytics/gates";
+import { computeGatesFor } from "@/lib/analytics/gates";
 import { formatCount, formatCurrency, formatPercent, formatDays } from "@/lib/format";
 import { Card, SectionHeading } from "@/components/ui/Card";
 import { Callout, Figure } from "@/components/ui/Callout";
@@ -21,7 +21,8 @@ export default async function SourcesPage({
   const { filters, ctx } = await resolvePage(searchParams);
 
   const sources = computeSourcePerformance(ctx);
-  const gates = computeGates(ctx);
+  // windowLeads: same time range as the source figures being judged.
+  const gates = computeGatesFor(ctx.windowLeads);
   const groupTdRate = gates.steps[1]?.passRatePct ?? null;
 
   const best = [...sources].sort(

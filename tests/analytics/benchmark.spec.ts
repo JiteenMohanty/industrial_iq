@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { rankBy, statusVsGroup, rate, median, mean, BENCHMARK } from "@/lib/analytics/benchmark";
+import {
+  rankBy,
+  statusVsGroup,
+  benchmark,
+  rate,
+  median,
+  mean,
+  BENCHMARK,
+} from "@/lib/analytics/benchmark";
 
 describe("rate / median / mean", () => {
   it("returns null on a zero denominator rather than NaN or Infinity (SC-006)", () => {
@@ -21,25 +29,83 @@ describe("rate / median / mean", () => {
 });
 
 describe("statusVsGroup", () => {
-  it("withholds a judgement below the minimum sample rather than guessing", () => {
-    expect(statusVsGroup(10, 80, BENCHMARK.minSample - 1)).toBe("neutral");
+  it("refuses to rate below the minimum sample, and says so distinctly", () => {
+    expect(statusVsGroup(10, 80, BENCHMARK.minSample - 1)).toBe("unrated");
   });
 
-  it("withholds a judgement when either figure is unmeasurable", () => {
-    expect(statusVsGroup(null, 80, 100)).toBe("neutral");
-    expect(statusVsGroup(50, null, 100)).toBe("neutral");
+  it("refuses to rate when either figure is unmeasurable", () => {
+    expect(statusVsGroup(null, 80, 100)).toBe("unrated");
+    expect(statusVsGroup(50, null, 100)).toBe("unrated");
   });
 
-  it("grades against the group figure in both directions", () => {
-    expect(statusVsGroup(90, 80, 100)).toBe("good");
-    expect(statusVsGroup(60, 80, 100)).toBe("critical");
-    expect(statusVsGroup(77, 80, 100)).toBe("warning");
-    expect(statusVsGroup(82, 80, 100)).toBe("neutral");
+  /**
+   * The bug this suite exists to prevent recurring.
+   *
+   * "unrated" and "onPar" used to be a single `neutral` state rendered as one dash reading
+   * "No reading". A rep 3 points ahead of the group and a rep on a 12-lead book we were declining
+   * to judge looked identical — and so did a rep 43 points *behind* on that same thin book. The
+   * two must stay distinguishable.
+   */
+  it("distinguishes 'in line with the group' from 'not rated'", () => {
+    const inLine = statusVsGroup(82, 80, 100); // +2pp, measured, plenty of sample
+    const tooFew = statusVsGroup(82, 80, BENCHMARK.minSample - 1); // same figures, thin book
+    expect(inLine).toBe("onPar");
+    expect(tooFew).toBe("unrated");
+    expect(inLine).not.toBe(tooFew);
+  });
+
+  it("grades every measurable figure into exactly one band", () => {
+    expect(statusVsGroup(90, 80, 100)).toBe("good"); // +10
+    expect(statusVsGroup(85, 80, 100)).toBe("good"); // +5, boundary
+    expect(statusVsGroup(84.9, 80, 100)).toBe("onPar"); // just inside
+    expect(statusVsGroup(80, 80, 100)).toBe("onPar"); // level
+    expect(statusVsGroup(75.1, 80, 100)).toBe("onPar"); // just inside on the low side
+    expect(statusVsGroup(75, 80, 100)).toBe("warning"); // -5, boundary
+    expect(statusVsGroup(70.1, 80, 100)).toBe("warning");
+    expect(statusVsGroup(70, 80, 100)).toBe("critical"); // -10, boundary
+    expect(statusVsGroup(40, 80, 100)).toBe("critical");
+  });
+
+  it("is symmetric around the group figure for the in-line band", () => {
+    const above = statusVsGroup(80 + BENCHMARK.onParGapPoints - 0.1, 80, 100);
+    const below = statusVsGroup(80 - BENCHMARK.onParGapPoints + 0.1, 80, 100);
+    expect(above).toBe("onPar");
+    expect(below).toBe("onPar");
   });
 
   it("inverts correctly when lower is better", () => {
     expect(statusVsGroup(60, 80, 100, { higherIsBetter: false })).toBe("good");
     expect(statusVsGroup(95, 80, 100, { higherIsBetter: false })).toBe("critical");
+    expect(statusVsGroup(81, 80, 100, { higherIsBetter: false })).toBe("onPar");
+  });
+});
+
+describe("benchmark", () => {
+  it("carries the gap alongside the status", () => {
+    const b = benchmark(83.3, 80, 100, { label: "Contact rate" });
+    expect(b.status).toBe("onPar");
+    expect(b.gapPoints).toBeCloseTo(3.3, 5);
+  });
+
+  it("spells the comparison out, so the glyph never has to be guessed at", () => {
+    const b = benchmark(90, 76.7, 33, { label: "Contact rate" });
+    expect(b.title).toContain("Contact rate");
+    expect(b.title).toContain("above");
+    expect(b.title).toContain("76.7%");
+    expect(b.title).toContain("33 leads");
+  });
+
+  it("explains a refusal to rate rather than leaving a bare dash", () => {
+    const b = benchmark(33.3, 76.7, 12, { label: "Contact rate" });
+    expect(b.status).toBe("unrated");
+    expect(b.gapPoints).toBeNull();
+    expect(b.title).toContain("Not rated");
+    expect(b.title).toContain("12 leads");
+    expect(b.title).toContain(String(BENCHMARK.minSample));
+  });
+
+  it("reads 'level with' at exactly the group figure", () => {
+    expect(benchmark(80, 80, 100).title).toContain("level with");
   });
 });
 

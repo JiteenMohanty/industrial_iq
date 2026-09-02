@@ -95,15 +95,24 @@ export const SEVERITY_META: Record<
   info: { label: "Info", glyph: "●", order: 2, tint: "bg-raised", ink: "text-ink-secondary" },
 };
 
-/** Traffic-light meta for benchmark tables — same no-colour-alone rule as severity. */
+/**
+ * Traffic-light meta for benchmark tables — the same no-colour-alone rule as severity: every state
+ * carries a distinct glyph and a word, so the reading survives greyscale and colour-blindness.
+ *
+ * `onPar` and `unrated` are deliberately separate states. One says "measured, and level with the
+ * group"; the other says "not rated, the sample is too small to be fair". Collapsing them into a
+ * single dash made a rep three points ahead of the group indistinguishable from one we were
+ * declining to judge, and gave the worst contact rate in the group no mark at all.
+ */
 export const STATUS_META: Record<
   PerfStatus,
   { label: string; glyph: string; dot: string; ink: string }
 > = {
   good: { label: "Ahead of group", glyph: "▲", dot: "bg-good", ink: "text-good-ink" },
-  warning: { label: "Slightly behind", glyph: "▪", dot: "bg-warning", ink: "text-warning-ink" },
-  critical: { label: "Well behind", glyph: "▼", dot: "bg-critical", ink: "text-critical-ink" },
-  neutral: { label: "No reading", glyph: "–", dot: "bg-baseline", ink: "text-ink-muted" },
+  onPar: { label: "In line with group", glyph: "＝", dot: "bg-baseline", ink: "text-ink-secondary" },
+  warning: { label: "Behind group", glyph: "▪", dot: "bg-warning", ink: "text-warning-ink" },
+  critical: { label: "Well behind group", glyph: "▼", dot: "bg-critical", ink: "text-critical-ink" },
+  unrated: { label: "Too few leads to rate", glyph: "–", dot: "bg-baseline", ink: "text-ink-muted" },
 };
 
 /** Resolves the theme-dependent colours Recharts and inline SVG need as literal strings. */

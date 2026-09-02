@@ -1733,3 +1733,55 @@ the real control row and so cannot move the page.
 first from source inspection, then from the RSC payload. Both were true and neither was sufficient,
 because the failure was a layout consequence that only a rendered measurement could reveal. The
 same lesson the v1 audit produced about "verified by structural code review", arriving again.
+
+## 2026-08-27 · Phase 12 · T330 — The status dash meant two different things
+
+**Decision**: Split the four-state benchmark into five, separating "in line with the group" from
+"not rated", and fix the baselines those statuses are measured against.
+
+**Reasoning**: Raised by the user, asking what it meant that one rep was "ahead of the group" while
+others had "no reading" — and whether it was accurate. It was not.
+
+`statusVsGroup` returned `neutral` for two unrelated reasons: the sample was below the 15-lead floor,
+*or* the gap fell between 0 and +5 points. Both rendered as a dash labelled "No reading". On the full
+range that put ten of twenty-five officers under one dash — five genuinely unmeasured, five sitting
+at or slightly *ahead* of the group. Sanjay Kulkarni (+3.3pp on 25 leads) was indistinguishable from
+Vikram Patel, whose 33.3% contact rate is the worst in the group and who showed the same dash because
+his book is 12 leads. A mark that says "no reading" while quietly meaning "fine, actually" is worse
+than no mark: it reads as a claim.
+
+The bands were also incomplete. `good` at >= +5 and `warning` at < 0 left 0 to +5 with no label of
+its own, which is what forced "slightly ahead" into the unmeasured bucket.
+
+New model — contiguous, exhaustive, symmetric around the group figure:
+
+| gap | status | glyph |
+|---|---|---|
+| >= +5pp | ahead of group | up triangle |
+| within ±5pp | in line with group | equals |
+| -10 to -5pp | behind group | square |
+| <= -10pp | well behind group | down triangle |
+| sample < 15 | not rated | dash |
+
+On the shipped data that resolves to 7 ahead, 7 in line, 1 behind, 5 well behind, 5 not rated —
+where before, ten were indistinguishable.
+
+Added `benchmark()`, which returns the status *and* the gap *and* a sentence explaining both, so
+every mark carries its own tooltip: "Contact rate: 3.3pp above the group figure of 76.7%, on 25
+leads", or "Not rated: contact rate rests on 12 leads, below the 15-lead floor for a fair
+comparison". A glyph is not self-describing and the reader should not have to ask what it was
+measured against. A `StatusLegend` now sits under the table with the group figures spelled out.
+
+**The bug underneath the confusion**: the reps and sources pages built their baselines from
+`computeGates(ctx)` — branch-scoped but *not* time-scoped — and the reps page used `ctx.groupLeads`,
+which is neither. So under a November filter each rep's rate was computed on November leads and then
+compared against an all-time group figure. Apples to oranges, silently. All three pages now derive
+baselines from `windowLeads`, the same scope as the figures being judged; verified that the November
+baseline (75.8%) now differs from the full-range one (76.7%). This is the same class of error the
+Phase 8 scope work fixed on `/branches`, surviving in the three pages that computed their baselines
+by hand rather than through `computeBranchGates`.
+
+**Tradeoff accepted, not hidden**: Priya Choudhury sits at 85.7% contact rate — comfortably "ahead"
+— on 14 leads, one short of the floor, so she shows as not rated. Lowering the floor to include her
+would be fitting the threshold to the data. The tooltip now states the reason, which is the honest
+resolution: the reader can see it is a sample judgement rather than a performance one.

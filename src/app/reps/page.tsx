@@ -1,13 +1,13 @@
 import { resolvePage, type SearchParams } from "@/lib/filters/page-context";
 import { buildHref } from "@/lib/filters/parse";
 import { computeRepPerformance, computeRepHeadToHead } from "@/lib/analytics/reps";
-import { computeGates } from "@/lib/analytics/gates";
-import { median, statusVsGroup, rankBy, rate, BENCHMARK } from "@/lib/analytics/benchmark";
+import { computeGatesFor } from "@/lib/analytics/gates";
+import { median, statusVsGroup, benchmark, rankBy, rate, BENCHMARK } from "@/lib/analytics/benchmark";
 import { formatCount, formatCurrency, formatPercent } from "@/lib/format";
 import { Card, SectionHeading } from "@/components/ui/Card";
 import { Callout, Figure } from "@/components/ui/Callout";
 import { DataTable, type Column, MetricBar } from "@/components/ui/DataTable";
-import { StatusDot, RankBadge } from "@/components/ui/Badge";
+import { StatusDot, RankBadge, StatusLegend } from "@/components/ui/Badge";
 import { StatTile } from "@/components/ui/StatTile";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { RepScatter } from "@/components/charts/RepScatter";
@@ -30,12 +30,15 @@ export default async function RepsPage({
   const officers = all.filter((r) => r.role === "sales_officer" && r.leadCount > 0);
   const managersWithoutLeads = all.filter((r) => r.role === "branch_manager" && r.leadCount === 0);
 
-  const gates = computeGates(ctx);
+  // Baselines come from windowLeads — every branch, on the SAME time range as the rep figures
+  // themselves. computeGates(ctx) is branch-scoped but not time-scoped, and ctx.groupLeads is
+  // neither, so either would have compared a rep's November rate against an all-time group rate.
+  const gates = computeGatesFor(ctx.windowLeads);
   const groupContact = gates.steps[0]?.passRatePct ?? null;
   const groupTd = gates.steps[1]?.passRatePct ?? null;
   const groupConversion = rate(
-    ctx.groupLeads.filter((l) => l.reachedStages.has("delivered")).length,
-    ctx.groupLeads.length,
+    ctx.windowLeads.filter((l) => l.reachedStages.has("delivered")).length,
+    ctx.windowLeads.length,
   );
 
   const medLeads = median(officers.map((r) => r.leadCount)) ?? 0;
@@ -85,33 +88,48 @@ export default async function RepsPage({
       header: "Contact",
       align: "right",
       hint: "of leads",
-      accessor: (r) => (
-        <span className="inline-flex items-center gap-1.5">
-          <StatusDot status={statusVsGroup(r.contactRatePct, groupContact, r.leadCount)} />
-          {r.contactRatePct === null ? "—" : formatPercent(r.contactRatePct)}
-        </span>
-      ),
+      accessor: (r) => {
+        const b = benchmark(r.contactRatePct, groupContact, r.leadCount, {
+          label: "Contact rate",
+        });
+        return (
+          <span className="inline-flex items-center gap-1.5">
+            <StatusDot status={b.status} title={b.title} />
+            {r.contactRatePct === null ? "—" : formatPercent(r.contactRatePct)}
+          </span>
+        );
+      },
     },
     {
       header: "Test drive",
       align: "right",
       hint: "of contacted",
-      accessor: (r) => (
-        <span className="inline-flex items-center gap-1.5">
-          <StatusDot status={statusVsGroup(r.testDriveRatePct, groupTd, r.contactedCount)} />
-          {r.testDriveRatePct === null ? "—" : formatPercent(r.testDriveRatePct)}
-        </span>
-      ),
+      accessor: (r) => {
+        const b = benchmark(r.testDriveRatePct, groupTd, r.contactedCount, {
+          label: "Test-drive rate",
+        });
+        return (
+          <span className="inline-flex items-center gap-1.5">
+            <StatusDot status={b.status} title={b.title} />
+            {r.testDriveRatePct === null ? "—" : formatPercent(r.testDriveRatePct)}
+          </span>
+        );
+      },
     },
     {
       header: "Conversion",
       align: "right",
-      accessor: (r) => (
-        <span className="inline-flex items-center gap-1.5">
-          <StatusDot status={statusVsGroup(r.conversionPct, groupConversion, r.leadCount)} />
-          {r.conversionPct === null ? "—" : formatPercent(r.conversionPct)}
-        </span>
-      ),
+      accessor: (r) => {
+        const b = benchmark(r.conversionPct, groupConversion, r.leadCount, {
+          label: "Conversion",
+        });
+        return (
+          <span className="inline-flex items-center gap-1.5">
+            <StatusDot status={b.status} title={b.title} />
+            {r.conversionPct === null ? "—" : formatPercent(r.conversionPct)}
+          </span>
+        );
+      },
     },
     { header: "Delivered", align: "right", accessor: (r) => formatCount(r.deliveredCount) },
     {
@@ -276,7 +294,7 @@ export default async function RepsPage({
         <Card>
           <SectionHeading
             title="All sales officers"
-            hint="Ranked by revenue per lead. Status marks compare each rep to the group's own figure; reps under 15 leads get no mark."
+            hint={`Ranked by revenue per lead. Each mark compares that rep to the group's own figure for the same period — hover any mark for the exact gap. Reps under ${BENCHMARK.minSample} leads are shown as “not rated” rather than judged on a thin book.`}
           />
           <DataTable
             columns={columns}
@@ -285,6 +303,13 @@ export default async function RepsPage({
             rowHref={(r) => buildHref(`/reps/${r.repId}`, filters)}
             minWidth={900}
             caption="Sales rep benchmark"
+          />
+          <StatusLegend
+            groupNote={`Group figures for this selection: contact ${
+              groupContact === null ? "—" : formatPercent(groupContact)
+            }, test drive ${groupTd === null ? "—" : formatPercent(groupTd)}, conversion ${
+              groupConversion === null ? "—" : formatPercent(groupConversion)
+            }.`}
           />
         </Card>
       </section>

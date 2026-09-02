@@ -123,6 +123,15 @@ literal ranking clicks through to it. I judged that a feed showing five differen
 problem is worth more on a cold open than one showing the five worst instances, which on this data
 means one problem repeated. That is a genuine tradeoff and I would defend it, but it is a choice.
 
+**Status marks distinguish "level with the group" from "not rated".** These started as four states
+where a single dash meant both "the sample is too small to judge" and "within a few points of the
+group". On the rep table that put ten of twenty-five officers under one label — five genuinely
+unmeasured, five sitting at or slightly *ahead*. The worst contact rate in the group showed the same
+dash as a rep performing fine, because his book was three leads short of the floor. A mark reading
+"no reading" while quietly meaning "fine, actually" is worse than no mark: it reads as a claim.
+Five states now, contiguous and symmetric around the group figure, and every mark carries a tooltip
+naming the gap, the figure it was measured against, and the sample it rests on.
+
 **Status marks are always relative to the group's own figure, never an industry benchmark.** This
 dataset supplies no external baseline. Inventing a "good" contact rate would make every ▲ and ▼
 unfalsifiable. So every judgement is "ahead of / behind *this group*", and the group figure is
@@ -373,7 +382,7 @@ code path, never from an analysis script or a formatted string.*
 
 | Check | Result |
 |---|---|
-| Test suite | 332 passing across 37 files |
+| Test suite | 338 passing across 37 files |
 | Production build | Clean, 12 routes, TypeScript strict, no errors |
 | Route smoke test | 41 URL variants including malformed params, unknown ids and a zero-result range — rendered output parsed for `NaN`/`Infinity`/`undefined`: none |
 | Horizontal overflow | Measured 0px on every route at 1440 / 1024 / 768 — after finding and fixing 199px on `/models` |
